@@ -1,0 +1,1 @@
+// Prefer a service-role key when available so ingest is not constrained by RLS.

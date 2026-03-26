@@ -1,4 +1,5 @@
-import { useRouter } from 'expo-router';
+import * as Linking from 'expo-linking';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -11,12 +12,43 @@ import { supabase } from '@/utils/supabase';
 export default function LoginScreen() {
   const { colors } = useTheme();
   const router = useRouter();
+  const params = useLocalSearchParams<{ redirectTo?: string }>();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  const [resetting, setResetting] = useState(false);
+  const [passwordVisible, setPasswordVisible] = useState(false);
+
+  const redirectTo =
+    typeof params.redirectTo === 'string' && params.redirectTo.startsWith('/')
+      ? params.redirectTo
+      : '/';
+
+  const close = () => {
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+    router.replace('/');
+  };
+
+  const finishAuth = () => {
+    if (redirectTo) {
+      router.replace(redirectTo as any);
+      return;
+    }
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+    router.replace('/');
+  };
+
+  const validateEmail = (value: string) => /\S+@\S+\.\S+/.test(value);
+  const validatePassword = (value: string) => value.length >= 8;
 
   const handleLogin = async () => {
     if (submitting) return;
@@ -26,6 +58,10 @@ export default function LoginScreen() {
     const trimmedEmail = email.trim();
     if (!trimmedEmail || !password) {
       setError('Please enter email and password.');
+      return;
+    }
+    if (!validateEmail(trimmedEmail)) {
+      setError('Please enter a valid email address.');
       return;
     }
 
@@ -41,7 +77,7 @@ export default function LoginScreen() {
         return;
       }
 
-      router.back();
+      finishAuth();
     } catch {
       setError('Something went wrong. Please try again.');
     } finally {
@@ -59,10 +95,18 @@ export default function LoginScreen() {
       setError('Please enter email and password.');
       return;
     }
+    if (!validateEmail(trimmedEmail)) {
+      setError('Please enter a valid email address.');
+      return;
+    }
+    if (!validatePassword(password)) {
+      setError('Use at least 8 characters for your password.');
+      return;
+    }
 
     setSubmitting(true);
     try {
-      const { error: signUpError } = await supabase.auth.signUp({
+      const { data, error: signUpError } = await supabase.auth.signUp({
         email: trimmedEmail,
         password,
       });
@@ -72,11 +116,52 @@ export default function LoginScreen() {
         return;
       }
 
-      setInfo('Check your email to confirm your account, then log in.');
+      if (data.session) {
+        setInfo('Account created. Redirecting…');
+        finishAuth();
+        return;
+      }
+
+      setInfo('Account created. Check your email if confirmation is required, then sign in.');
     } catch {
       setError('Something went wrong. Please try again.');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    if (resetting || submitting) return;
+
+    setError(null);
+    setInfo(null);
+
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail) {
+      setError('Enter your email address first.');
+      return;
+    }
+    if (!validateEmail(trimmedEmail)) {
+      setError('Please enter a valid email address.');
+      return;
+    }
+
+    setResetting(true);
+    try {
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(trimmedEmail, {
+        redirectTo: Linking.createURL('/auth/update-password'),
+      });
+
+      if (resetError) {
+        setError(resetError.message);
+        return;
+      }
+
+      setInfo('Password reset email sent. Open the link on this device/browser to continue.');
+    } catch {
+      setError('Could not send reset email. Please try again.');
+    } finally {
+      setResetting(false);
     }
   };
 
@@ -90,11 +175,11 @@ export default function LoginScreen() {
         keyboardVerticalOffset={24}>
         <View style={[styles.content, { paddingHorizontal: 20 }] }>
           <View style={styles.headerRow}>
-            <TouchableOpacity onPress={() => router.back()} style={styles.closeButton}>
+            <TouchableOpacity onPress={close} style={styles.closeButton}>
               <IconSymbol name="xmark" size={18} color={colors.text} />
             </TouchableOpacity>
             <ThemedText type="title" style={[styles.title, { color: colors.text }] }>
-              Login
+              Sign in
             </ThemedText>
           </View>
 
@@ -112,6 +197,9 @@ export default function LoginScreen() {
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
+                autoComplete="email"
+                textContentType="emailAddress"
+                returnKeyType="next"
                 style={[styles.input, { color: colors.text }]}
               />
             </View>
@@ -126,14 +214,21 @@ export default function LoginScreen() {
                 onChangeText={setPassword}
                 placeholder="Your password"
                 placeholderTextColor={colors.textTertiary}
-                secureTextEntry
+                secureTextEntry={!passwordVisible}
                 autoCapitalize="none"
+                autoComplete="password"
+                textContentType="password"
+                returnKeyType="done"
+                onSubmitEditing={handleLogin}
                 style={[styles.input, { color: colors.text }]}
               />
+              <TouchableOpacity onPress={() => setPasswordVisible((current) => !current)} style={styles.trailingButton}>
+                <IconSymbol name={passwordVisible ? 'eye.slash' : 'eye'} size={16} color={colors.textTertiary} />
+              </TouchableOpacity>
             </View>
 
             {error ? (
-              <ThemedText style={[styles.errorText, { color: colors.error }] }>
+              <ThemedText style={[styles.errorText, { color: colors.danger }] }>
                 {error}
               </ThemedText>
             ) : null}
@@ -143,6 +238,15 @@ export default function LoginScreen() {
                 {info}
               </ThemedText>
             ) : null}
+
+            <TouchableOpacity
+              style={styles.inlineAction}
+              onPress={handleForgotPassword}
+              disabled={resetting || submitting}>
+              <ThemedText style={{ color: colors.primary, fontSize: 13, fontWeight: '600' }}>
+                {resetting ? 'Sending reset email…' : 'Forgot password?'}
+              </ThemedText>
+            </TouchableOpacity>
 
             <TouchableOpacity
               style={[styles.primaryButton, { backgroundColor: disabled ? colors.surfaceElevated : colors.primary }]}
@@ -225,6 +329,13 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     paddingVertical: 0,
+  },
+  trailingButton: {
+    padding: 4,
+  },
+  inlineAction: {
+    alignSelf: 'flex-start',
+    marginTop: 10,
   },
   primaryButton: {
     marginTop: 20,

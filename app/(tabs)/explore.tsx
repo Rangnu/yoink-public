@@ -1,8 +1,10 @@
 import { ThemedText } from '@/components/themed-text';
+import { CoinSparkline } from '@/components/ui/coin-sparkline';
 import { BitcoinIcon } from '@/components/ui/bitcoin-icon';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useSettings } from '@/contexts/settings-context';
 import { useTheme } from '@/contexts/theme-context';
+import { useWatchlist } from '@/contexts/watchlist-context';
 import { supabase } from '@/utils/supabase';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -12,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 export default function ExploreScreen() {
   const { colors } = useTheme();
   const { t } = useSettings();
+  const { isSaved, toggleSaved } = useWatchlist();
   const [refreshing, setRefreshing] = useState(false);
   const [stocksTab, setStocksTab] = useState<'volume' | 'trades' | 'gainers' | 'losers' | 'popular'>('volume');
   const [coinsData, setCoinsData] = useState<any[]>([]);
@@ -72,14 +75,6 @@ export default function ExploreScreen() {
   }, [coinsData]);
 
   // ticker animation handled in <Ticker />
-
-  const posts = [
-    { id: 1, user: 'OnchainHunter', time: '2h ago', title: 'SOL breakout on heavy volume 🚀', content: 'Solana just broke key resistance with huge on-chain volume. Funding flipping positive across majors.', likes: 124, comments: 32, ticker: 'SOL', verified: true },
-    { id: 2, user: 'DeFiNerd', time: '4h ago', title: 'DeFi rotation into ETH L2s', content: 'Seeing TVL and volume rotate from mainnet into ARB/OP. Watch bridging flows and new farm launches.', likes: 89, comments: 18, ticker: 'ARB', verified: true },
-    { id: 3, user: 'MemeKing', time: '6h ago', title: 'PEPE volume spike incoming', content: 'On-chain DEX volume up 300% in the last hour. Meme season might not be over yet.', likes: 256, comments: 67, ticker: 'PEPE', verified: false },
-    { id: 4, user: 'DiamondHands', time: '8h ago', title: 'Why I\'m still stacking BTC', content: 'ETF inflows + halving narrative still strong. I\'m DCA-ing every dip into BTC + a few blue-chip alts.', likes: 178, comments: 45, ticker: 'BTC', verified: false },
-    { id: 5, user: 'CryptoWhale', time: '10h ago', title: 'Altcoin rotation watchlist', content: 'Meme and AI coins rotating fast. Keep an eye on WIF, FLOKI, and PYTH for continuation setups.', likes: 142, comments: 28, ticker: 'WIF', verified: true },
-  ];
 
   const stockLists = useMemo(() => {
     if (!coinsData.length) {
@@ -145,12 +140,6 @@ export default function ExploreScreen() {
     return { volume, trades, gainers, losers, popular };
   }, [coinsData]);
 
-  const upcomingReports = [
-    { s: 'BTC', when: 'Next halving window' },
-    { s: 'ETH', when: 'Protocol upgrade this week' },
-    { s: 'SOL', when: 'Major network event soon' },
-  ];
-
   return (
     <SafeAreaView edges={["top","left","right"]} style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.headerRow}>
@@ -168,7 +157,7 @@ export default function ExploreScreen() {
             refreshing={refreshing}
             onRefresh={() => {
               setRefreshing(true);
-              setTimeout(() => setRefreshing(false), 900);
+              loadCoins().finally(() => setRefreshing(false));
             }}
             tintColor={colors.primary}
             title={t('RefreshTitle')}
@@ -207,20 +196,34 @@ export default function ExploreScreen() {
             ))}
           </View>
           <View style={{ borderTopWidth: 1, borderTopColor: colors.border }} />
-          {stockLists[stocksTab].map((row, i) => (
-            <View key={row.s} style={[styles.plainRow, { borderBottomColor: colors.border, borderBottomWidth: i===stockLists[stocksTab].length-1 ? 0 : 1 }]}> 
+          {stockLists[stocksTab].map((row, i) => {
+            const saved = isSaved(row.s);
+            return (
+            <TouchableOpacity
+              key={row.s}
+              style={[styles.plainRow, { borderBottomColor: colors.border, borderBottomWidth: i===stockLists[stocksTab].length-1 ? 0 : 1 }]}
+              onPress={() => router.push({ pathname: '/coin/[symbol]' as any, params: { symbol: row.s } })}
+            > 
               <ThemedText style={{ color: colors.text, width: 22, textAlign: 'right', marginRight: 6 }}>{i+1}</ThemedText>
               <ThemedText style={{ color: colors.text, width: 72 }}>{row.s}</ThemedText>
               <View style={{ flex: 1, paddingRight: 8 }}>
-                <Sparkline colors={colors} negative={row.c.startsWith('-')} />
+                <CoinSparkline
+                  symbol={row.s}
+                  color={row.c.startsWith('-') ? colors.danger : colors.success}
+                  width={74}
+                />
               </View>
               <ThemedText style={{ color: colors.textSecondary, width: 80, textAlign: 'right', marginRight: 10 }}>{row.p}</ThemedText>
               <ThemedText style={{ color: row.c.startsWith('-') ? colors.danger : colors.success, fontWeight: '700', width: 70, textAlign: 'right' }}>{row.c}</ThemedText>
-              <TouchableOpacity accessibilityLabel="Save" style={{ padding: 6, marginLeft: 8 }}>
-                <IconSymbol name="bookmark.fill" size={18} color={colors.textTertiary} />
+              <TouchableOpacity
+                accessibilityLabel={saved ? `Remove ${row.s} from saved` : `Save ${row.s}`}
+                style={{ padding: 6, marginLeft: 8 }}
+                onPress={() => toggleSaved(row.s)}
+              >
+                <IconSymbol name={saved ? 'bookmark.fill' : 'bookmark'} size={18} color={saved ? colors.primary : colors.textTertiary} />
               </TouchableOpacity>
-            </View>
-          ))}
+            </TouchableOpacity>
+          )})}
           <TouchableOpacity 
             onPress={() => router.push({ pathname: '/explore/top100' as any, params: { tab: stocksTab } })}
             style={[styles.moreBtn, { borderColor: colors.border }]}
@@ -230,86 +233,13 @@ export default function ExploreScreen() {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <ThemedText type="subtitle" style={[styles.sectionTitle, { color: colors.text }]}>{t('UpcomingReports')}</ThemedText>
-          </View>
-          <View style={[styles.listCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            {upcomingReports.map((r, i) => (
-              <View key={r.s} style={[styles.listRow, { borderBottomColor: colors.border, borderBottomWidth: i===upcomingReports.length-1 ? 0 : 1 }]}> 
-                <ThemedText style={{ color: colors.text, flex: 1 }}>{r.s}</ThemedText>
-                <ThemedText style={{ color: colors.textSecondary }}>{r.when}</ThemedText>
-              </View>
-            ))}
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <ThemedText type="subtitle" style={[styles.sectionTitle, { color: colors.text }]}>{t('HotCommunityPosts')}</ThemedText>
-          </View>
-          {posts.map((post) => (
-            <View
-              key={post.id}
-              style={[
-                styles.postCard,
-                {
-                  backgroundColor: colors.surfaceElevated,
-                  borderColor: colors.border,
-                  shadowColor: '#000',
-                  shadowOpacity: 0.12,
-                  shadowRadius: 8,
-                  shadowOffset: { width: 0, height: 4 },
-                  elevation: 2,
-                },
-              ]}
-            > 
-              <View style={styles.postHeader}>
-                <View style={styles.postUser}>
-                  <View style={[styles.avatar, { backgroundColor: colors.surfaceElevated }]}> 
-                    <IconSymbol name="person.fill" size={16} color={colors.primary} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <ThemedText type="defaultSemiBold" style={{ color: colors.text }}>{post.user}</ThemedText>
-                      {post.verified && (
-                        <IconSymbol name="checkmark.seal.fill" size={14} color={colors.primary} />
-                      )}
-                    </View>
-                    <ThemedText style={{ color: colors.textTertiary, fontSize: 12 }}>{post.time}</ThemedText>
-                  </View>
-                </View>
-                <TouchableOpacity style={{ padding: 6 }}>
-                  <IconSymbol name="ellipsis" size={18} color={colors.textTertiary} />
-                </TouchableOpacity>
-              </View>
-
-              <ThemedText type="defaultSemiBold" style={{ color: colors.text, marginTop: 12, fontSize: 16 }}>{post.title}</ThemedText>
-              {post.ticker && (
-                <View style={[styles.tickerBadge, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}> 
-                  <ThemedText style={{ color: colors.primary, fontSize: 12, fontWeight: '700' }}>${post.ticker}</ThemedText>
-                </View>
-              )}
-              <ThemedText style={{ color: colors.textSecondary, marginTop: 8, lineHeight: 20 }} numberOfLines={3}>{post.content}</ThemedText>
-
-              <View style={styles.postActions}>
-                <TouchableOpacity style={styles.actionItem}>
-                  <IconSymbol name="heart" size={18} color={colors.textTertiary} />
-                  <ThemedText style={{ color: colors.textSecondary, fontSize: 13 }}>{post.likes}</ThemedText>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.actionItem}>
-                  <IconSymbol name="bubble.left" size={18} color={colors.textTertiary} />
-                  <ThemedText style={{ color: colors.textSecondary, fontSize: 13 }}>{post.comments}</ThemedText>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.actionItem}>
-                  <IconSymbol name="arrow.2.squarepath" size={18} color={colors.textTertiary} />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.actionItem}>
-                  <IconSymbol name="square.and.arrow.up" size={18} color={colors.textTertiary} />
-                </TouchableOpacity>
-              </View>
-            </View>
-          ))}
+        <View style={[styles.infoCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <ThemedText type="defaultSemiBold" style={{ color: colors.text }}>
+            Explore is live-data first now
+          </ThemedText>
+          <ThemedText style={{ color: colors.textSecondary, marginTop: 6, lineHeight: 20 }}>
+            Tap a coin row to open details. Bookmark icons save coins locally on this device while shared watchlists and alerts are still being built.
+          </ThemedText>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -328,27 +258,6 @@ function CategoryButton({ colors, emoji, icon, label, renderIcon }: { colors: an
       )}
       <ThemedText style={{ color: colors.text, fontSize: 12, fontWeight: '600' }}>{label}</ThemedText>
     </TouchableOpacity>
-  );
-}
-
-function MiniTab({ colors, label, active, onPress }: { colors: any; label: string; active?: boolean; onPress?: () => void }) {
-  return (
-    <TouchableOpacity onPress={onPress} style={[styles.miniTab, { backgroundColor: active ? colors.primary : colors.surface, borderColor: active ? colors.primary : colors.border }]}> 
-      <ThemedText style={{ color: active ? colors.primaryText : colors.text, fontSize: 12, fontWeight: '700' }}>{label}</ThemedText>
-    </TouchableOpacity>
-  );
-}
-
-function Sparkline({ colors, negative }: { colors: any; negative?: boolean }) {
-  // Simple fixed mock data for sparkline visual
-  const data = [8, 12, 6, 14, 10, 16, 9, 13, 7, 15];
-  const barColor = negative ? colors.danger : colors.success;
-  return (
-    <View style={styles.sparkContainer}>
-      {data.map((h, i) => (
-        <View key={i} style={[styles.sparkBar, { height: 6 + h, backgroundColor: barColor }]} />
-      ))}
-    </View>
   );
 }
 
@@ -434,47 +343,8 @@ const styles = StyleSheet.create({
   inlineTabsRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 14, paddingTop: 6, paddingBottom: 6 },
   inlineTabItem: { alignItems: 'center' },
   inlineTabUnderline: { height: 2, borderRadius: 1, alignSelf: 'stretch', marginTop: 4 },
-  listCard: { borderWidth: 1, borderRadius: 12, overflow: 'hidden' },
-  listRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 12 },
   plainRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12 },
   moreBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, borderTopWidth: 1, paddingHorizontal: 12, paddingVertical: 12, alignSelf: 'center' },
-  postCard: {
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 10,
-  },
-  postHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  postUser: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  postActions: {
-    flexDirection: 'row',
-    gap: 14,
-    marginTop: 12,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.05)',
-  },
-  actionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
+  infoCard: { borderRadius: 12, borderWidth: 1, padding: 14 },
   tickerRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  sparkContainer: { flexDirection: 'row', alignItems: 'flex-end', gap: 2, height: 24 },
-  sparkBar: { width: 3, borderRadius: 2 },
 });

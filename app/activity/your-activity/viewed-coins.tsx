@@ -1,21 +1,22 @@
 import { ActivityEventList } from '@/components/activity-event-list';
 import { useActivity } from '@/contexts/activity-context';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/contexts/theme-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-export default function WatchedStocksScreen() {
+export default function ViewedCoinsScreen() {
   const { colors } = useTheme();
   const { events } = useActivity();
+
   const viewedEvents = events.filter((event) => event.eventType === 'view_coin');
 
   return (
     <SafeAreaView edges={["top","left","right"]} style={{ flex: 1, backgroundColor: colors.background }}>
       <ActivityEventList
         title="Viewed coins"
-        subtitle="Legacy route for the same viewed-coin activity feed."
+        subtitle="This is captured when you open a coin detail screen."
         events={viewedEvents}
         emptyTitle="No viewed coins yet"
-        emptyBody="Open a coin detail page and your recently viewed coins will appear here."
+        emptyBody="Open any coin from Home, Explore, Markets, Top 100, or Scouters and it will appear here."
       />
     </SafeAreaView>
   );

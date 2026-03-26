@@ -35,12 +35,14 @@ export default function YourActivityLayout() {
           ),
         })}
       />
+      <Stack.Screen name="viewed-coins" options={{ title: 'Viewed coins' }} />
+      <Stack.Screen name="saved-history" options={{ title: 'Saved history' }} />
       <Stack.Screen name="interactions/likes" options={{ title: t('Likes') }} />
       <Stack.Screen name="interactions/comments" options={{ title: t('Comments') }} />
       <Stack.Screen name="interactions/reposts" options={{ title: t('Reposts') }} />
-      <Stack.Screen name="usage/watched-stocks" options={{ title: t('WatchedStocks') }} />
-      <Stack.Screen name="usage/account-history" options={{ title: t('AccountHistory') }} />
-      <Stack.Screen name="usage/recent-searches" options={{ title: t('RecentSearches') }} />
+      <Stack.Screen name="usage/watched-stocks" options={{ title: 'Viewed coins' }} />
+      <Stack.Screen name="usage/account-history" options={{ title: 'Account history' }} />
+      <Stack.Screen name="usage/recent-searches" options={{ title: 'Search history' }} />
     </Stack>
   );
 }

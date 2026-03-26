@@ -1,7 +1,10 @@
 #!/usr/bin/env node
+/* eslint-env node */
 
 // Simple CoinGecko → Supabase worker for Yoink MVP.
-// - Uses .env values: supabase_yoink_url, supabase_yoink_anon_key, COIN_GECKO_API_KEY
+// - Uses .env values: supabase_yoink_url / EXPO_PUBLIC_SUPABASE_URL,
+//   supabase_yoink_anon_key / EXPO_PUBLIC_SUPABASE_ANON_KEY,
+//   COIN_GECKO_API_KEY
 // - Every 5 minutes: fetches top 30 coins by market cap and writes snapshots into Supabase.
 
 const path = require('path');
@@ -11,8 +14,9 @@ const dotenv = require('dotenv');
 const envPath = path.join(__dirname, '..', '.env');
 dotenv.config({ path: envPath });
 
-const SUPABASE_URL = process.env.supabase_yoink_url;
-const SUPABASE_ANON_KEY = process.env.supabase_yoink_anon_key;
+const SUPABASE_URL = process.env.supabase_yoink_url || process.env.EXPO_PUBLIC_SUPABASE_URL;
+const SUPABASE_ANON_KEY =
+  process.env.supabase_yoink_anon_key || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 // Prefer a service-role key when available so ingest is not constrained by RLS.
 // EXPO_PUBLIC_SUPABASE_ROLE_KEY is used here only in this Node script and must
 // never be referenced from the client app code.
@@ -21,7 +25,7 @@ const SUPABASE_KEY = SUPABASE_SERVICE_ROLE_KEY || SUPABASE_ANON_KEY;
 const COIN_GECKO_API_KEY = process.env.COIN_GECKO_API_KEY;
 
 if (!SUPABASE_URL || !SUPABASE_KEY) {
-  console.error('[ingest] Missing supabase_yoink_url or Supabase key in .env');
+  console.error('[ingest] Missing Supabase URL or Supabase key in .env');
   process.exit(1);
 }
 

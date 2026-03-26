@@ -1,377 +1,393 @@
+import { useRouter } from 'expo-router';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useAuth } from '@/contexts/auth-context';
 import { useSettings } from '@/contexts/settings-context';
 import { useTheme } from '@/contexts/theme-context';
-import { useRouter } from 'expo-router';
-import { ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useWatchlist } from '@/contexts/watchlist-context';
+import { fetchCoinMarketRows, getLatestTimestamp } from '@/utils/coin-market';
 
 export default function MenuScreen() {
-  const { colors, theme, setTheme } = useTheme();
+  const { colors } = useTheme();
   const router = useRouter();
   const { t } = useSettings();
   const { user, signOut } = useAuth();
+  const { symbols, mode, syncState } = useWatchlist();
 
-  const themeOptions = [
-    { value: 'light' as const, label: 'Light', icon: 'sun.max.fill' as const },
-    { value: 'dark' as const, label: 'Dark', icon: 'moon.fill' as const },
-    { value: 'system' as const, label: 'System', icon: 'gearshape.fill' as const },
-  ];
+  const [refreshing, setRefreshing] = useState(false);
+  const [marketCount, setMarketCount] = useState(0);
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+  const [feedStatus, setFeedStatus] = useState<'live' | 'empty' | 'error'>('empty');
 
-  const menuItems = [
-    { id: 1, icon: 'creditcard', label: 'Subscription', section: 'account' },
-    { id: 2, icon: 'chart.line.uptrend.xyaxis', label: 'Portfolio', section: 'features' },
-    { id: 3, icon: 'bell.fill', label: 'Notifications', section: 'features' },
-    { id: 4, icon: 'list.bullet.rectangle', label: 'Watchlists', section: 'features' },
-  ];
+  const loadStatus = useCallback(async () => {
+    try {
+      const rows = await fetchCoinMarketRows(120);
+      setMarketCount(rows.length);
+      setLastUpdated(getLatestTimestamp(rows));
+      setFeedStatus(rows.length ? 'live' : 'empty');
+    } catch {
+      setMarketCount(0);
+      setLastUpdated(null);
+      setFeedStatus('error');
+    }
+  }, []);
 
-  const supportItems = [
-    { id: 1, icon: 'bubble.left', label: 'Help & Support' },
-    { id: 2, icon: 'doc.text', label: 'Terms of Service' },
-    { id: 3, icon: 'lock.fill', label: 'Privacy Policy' },
-  ];
+  useEffect(() => {
+    loadStatus();
+  }, [loadStatus]);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    loadStatus().finally(() => setRefreshing(false));
+  }, [loadStatus]);
+
+  const accountSubtitle = user?.email || 'Sign in to sync settings and saved items later';
+  const pushLogin = (redirectTo: string) =>
+    router.push({ pathname: '/auth/login', params: { redirectTo } } as any);
+  const feedStatusLabel = useMemo(() => {
+    if (feedStatus === 'live') return 'Live';
+    if (feedStatus === 'error') return 'Offline';
+    return 'Waiting for ingest';
+  }, [feedStatus]);
 
   return (
-    <SafeAreaView edges={["top","left","right"]} style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView contentContainerStyle={styles.content} contentInsetAdjustmentBehavior="never">
-        {/* Search */}
-        <View style={[styles.searchBar, { backgroundColor: colors.surface, borderColor: colors.border }]}> 
-          <IconSymbol name="magnifyingglass" size={16} color={colors.textTertiary} />
-          <TextInput
-            placeholder={t('SettingsSearchPlaceholder')}
-            placeholderTextColor={colors.textTertiary}
-            style={[styles.searchInput, { color: colors.text }]}
+    <SafeAreaView edges={["top", "left", "right"]} style={[styles.container, { backgroundColor: colors.background }]}> 
+      <ScrollView
+        contentContainerStyle={styles.content}
+        contentInsetAdjustmentBehavior="never"
+        refreshControl={(
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+            title={t('RefreshTitle')}
+            titleColor={colors.primary}
+            colors={[colors.primary]}
+            progressBackgroundColor={colors.surface}
           />
+        )}
+      >
+        <View style={styles.header}>
+          <ThemedText type="title" style={{ color: colors.text }}>Menu</ThemedText>
+          <ThemedText style={[styles.subtitle, { color: colors.textSecondary }]}>Account, app status, settings, and support.</ThemedText>
         </View>
-        {/* Account */}
-        <View style={styles.section}>
-          
-          
-          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <TouchableOpacity
-              style={styles.accountRow}
-              onPress={() => {
-                if (!user) {
-                  router.push('/auth/login');
-                }
-              }}>
-              <View style={[styles.avatar, { backgroundColor: colors.surfaceElevated }]}>
-                <IconSymbol name="person.fill" size={32} color={colors.primary} />
-              </View>
-              <View style={styles.accountInfo}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <ThemedText type="defaultSemiBold" style={{ color: colors.text, fontSize: 18 }}>
-                    {user?.email || t('GuestUser')}
+
+        <View style={[styles.accountCard, { backgroundColor: colors.surface, borderColor: colors.border }]}> 
+          <TouchableOpacity
+            style={styles.accountRow}
+            onPress={() => {
+              if (!user) {
+                pushLogin('/menu');
+              }
+            }}
+          >
+            <View style={[styles.avatar, { backgroundColor: colors.surfaceElevated }]}> 
+              <IconSymbol name="person.fill" size={28} color={colors.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <View style={styles.accountTitleRow}>
+                <ThemedText type="defaultSemiBold" style={{ color: colors.text, fontSize: 18 }}>
+                  {user?.email || t('GuestUser')}
+                </ThemedText>
+                <View style={[styles.pill, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}> 
+                  <ThemedText style={{ color: colors.textSecondary, fontSize: 11, fontWeight: '700' }}>
+                    {user ? 'Signed in' : 'Guest'}
                   </ThemedText>
-                  <View style={[styles.freeBadge, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
-                    <ThemedText style={{ color: colors.textSecondary, fontSize: 10, fontWeight: '600' }}>{t('Free')}</ThemedText>
-                  </View>
-                </View>
-                <ThemedText style={{ color: colors.textSecondary, fontSize: 13, marginTop: 4 }}>
-                  {user?.email || 'guest@yoink.app'}
-                </ThemedText>
-              </View>
-              <IconSymbol name="chevron.right" size={18} color={colors.textTertiary} />
-            </TouchableOpacity>
-            {user && (
-              <TouchableOpacity style={[styles.logoutButton, { borderColor: colors.border }]} onPress={signOut}>
-                <IconSymbol name="rectangle.portrait.and.arrow.right" size={16} color={colors.textSecondary} />
-                <ThemedText style={{ color: colors.textSecondary, fontSize: 13 }}>
-                  Logout
-                </ThemedText>
-              </TouchableOpacity>
-            )}
-            
-            {/* Wallet Balance */}
-            <View style={[styles.walletBalance, { backgroundColor: colors.surfaceElevated }]}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                  <View style={[styles.coinIcon, { backgroundColor: colors.primary }]}>
-                    <IconSymbol name="dollarsign.circle.fill" size={24} color={colors.primaryText} />
-                  </View>
-                  <View>
-                    <ThemedText style={{ color: colors.textTertiary, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>{t('Balance')}</ThemedText>
-                    <ThemedText type="defaultSemiBold" style={{ color: colors.text, fontSize: 28, fontWeight: '700', marginTop: 2 }}>
-                      25
-                    </ThemedText>
-                  </View>
-                </View>
-                <View style={{ alignItems: 'flex-end' }}>
-                  <ThemedText style={{ color: colors.textTertiary, fontSize: 11 }}>{t('Available')}</ThemedText>
-                  <ThemedText style={{ color: colors.primary, fontSize: 13, fontWeight: '600', marginTop: 2 }}>5 {t('AdsLeft')}</ThemedText>
                 </View>
               </View>
+              <ThemedText style={{ color: colors.textSecondary, fontSize: 13, marginTop: 4 }}>
+                {accountSubtitle}
+              </ThemedText>
             </View>
+            <IconSymbol name="chevron.right" size={18} color={colors.textTertiary} />
+          </TouchableOpacity>
 
-            {/* Coin Action Stats */}
-            <View style={styles.statsRowInside}>
-              <View style={[styles.statMiniInside, { backgroundColor: colors.surfaceElevated }]}>
-                <ThemedText style={{ color: colors.textTertiary, fontSize: 10 }}>{t('DailyClaim')}</ThemedText>
-                <ThemedText style={{ color: colors.success, fontSize: 14, fontWeight: '700', marginTop: 2 }}>+4</ThemedText>
-              </View>
-              <View style={[styles.statMiniInside, { backgroundColor: colors.surfaceElevated }]}>
-                <ThemedText style={{ color: colors.textTertiary, fontSize: 10 }}>{t('PerAd')}</ThemedText>
-                <ThemedText style={{ color: colors.primary, fontSize: 14, fontWeight: '700', marginTop: 2 }}>+3</ThemedText>
-              </View>
-              <View style={[styles.statMiniInside, { backgroundColor: colors.surfaceElevated }]}>
-                <ThemedText style={{ color: colors.textTertiary, fontSize: 10 }}>{t('MaxPerDay')}</ThemedText>
-                <ThemedText style={{ color: colors.text, fontSize: 14, fontWeight: '700', marginTop: 2 }}>15</ThemedText>
-              </View>
-            </View>
+          {!user ? (
+            <TouchableOpacity style={[styles.primaryButton, { backgroundColor: colors.primary }]} onPress={() => pushLogin('/menu')}>
+              <IconSymbol name="person.crop.circle.badge.plus" size={16} color={colors.primaryText} />
+              <ThemedText style={{ color: colors.primaryText, fontWeight: '700' }}>Sign in / Register</ThemedText>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity style={[styles.secondaryButton, { borderColor: colors.border }]} onPress={signOut}>
+              <IconSymbol name="rectangle.portrait.and.arrow.right" size={16} color={colors.textSecondary} />
+              <ThemedText style={{ color: colors.textSecondary, fontWeight: '600' }}>Logout</ThemedText>
+            </TouchableOpacity>
+          )}
+        </View>
 
-            {/* Action Buttons Inside */}
-            <View style={styles.actionButtonsInside}>
-              <TouchableOpacity style={[styles.primaryButtonInside, { backgroundColor: colors.primary }]}>
-                <IconSymbol name="gift.fill" size={16} color={colors.primaryText} />
-                <ThemedText style={[styles.buttonTextSmall, { color: colors.primaryText }]}>
-                  {t('ClaimDaily')}
-                </ThemedText>
-              </TouchableOpacity>
+        <View style={styles.statsGrid}>
+          <StatCard
+            label={mode === 'account' ? 'Saved sync' : 'Saved local'}
+            value={`${symbols.length}`}
+            detail={
+              mode === 'account'
+                ? syncState === 'error'
+                  ? 'needs retry'
+                  : 'account watchlist'
+                : 'guest device list'
+            }
+            colors={colors}
+          />
+          <StatCard label="Market feed" value={`${marketCount}`} detail="tracked coins" colors={colors} />
+          <StatCard label="Status" value={feedStatusLabel} detail={lastUpdated ? formatRelativeTime(lastUpdated) : 'No timestamp'} colors={colors} />
+          <StatCard label="Sync" value={user ? 'Account' : 'Local'} detail={user ? 'Auth session ready' : 'Device-only mode'} colors={colors} />
+        </View>
 
-              <TouchableOpacity style={[styles.secondaryButtonInside, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                <IconSymbol name="play.rectangle.fill" size={16} color={colors.primary} />
-                <ThemedText style={[styles.buttonTextSmall, { color: colors.primary }]}>
-                  {t('WatchAndEarn')}
-                </ThemedText>
-              </TouchableOpacity>
-            </View>
+        <View style={[styles.infoCard, { backgroundColor: colors.surface, borderColor: colors.border }]}> 
+          <ThemedText style={{ color: colors.text, fontWeight: '700' }}>Product status</ThemedText>
+          <View style={styles.statusList}>
+            <StatusRow icon="checkmark.circle.fill" text="Auth flow is live" tone={colors.success} colors={colors} />
+            <StatusRow icon="checkmark.circle.fill" text="Market feed is powered by Supabase" tone={colors.success} colors={colors} />
+            <StatusRow icon="bookmark.fill" text="Saved coins are local-only for now" tone={colors.primary} colors={colors} />
+            <StatusRow icon="scope" text="Scouters use live presets; custom scanners come next" tone={colors.text} colors={colors} />
           </View>
         </View>
 
-        {/* Settings */}
-        <View style={styles.section}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <IconSymbol name="gearshape.fill" size={18} color={colors.text} />
-            <ThemedText type="subtitle" style={[styles.sectionTitle, { color: colors.text }]}> 
-              {t('Settings')}
-            </ThemedText>
-          </View>
-          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <TouchableOpacity onPress={() => router.push('/settings/appearance')} style={[styles.settingRow, { borderBottomWidth: 0.5, borderBottomColor: colors.border }]}> 
-              <View style={styles.themeOptionLeft}>
-                <IconSymbol name="paintbrush.fill" size={20} color={colors.text} />
-                <ThemedText style={{ color: colors.text }}>{t('Appearance')}</ThemedText>
-              </View>
-              <IconSymbol name="chevron.right" size={16} color={colors.textTertiary} />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => router.push('/settings/language')} style={[styles.settingRow, { borderBottomWidth: 0.5, borderBottomColor: colors.border }]}> 
-              <View style={styles.themeOptionLeft}>
-                <IconSymbol name="globe" size={20} color={colors.text} />
-                <ThemedText style={{ color: colors.text }}>{t('Language')}</ThemedText>
-              </View>
-              <IconSymbol name="chevron.right" size={16} color={colors.textTertiary} />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => router.push('/settings/currency')} style={[styles.settingRow, { borderBottomWidth: 0.5, borderBottomColor: colors.border }]}> 
-              <View style={styles.themeOptionLeft}>
-                <IconSymbol name="dollarsign.circle" size={20} color={colors.text} />
-                <ThemedText style={{ color: colors.text }}>{t('Currency')}</ThemedText>
-              </View>
-              <IconSymbol name="chevron.right" size={16} color={colors.textTertiary} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => {
-                if (!user) {
-                  router.push('/auth/login');
-                } else {
-                  router.push('/settings/subscription');
-                }
-              }}
-              style={[styles.settingRow, { borderBottomWidth: 0.5, borderBottomColor: colors.border }]}> 
-              <View style={styles.themeOptionLeft}>
-                <IconSymbol name="creditcard" size={20} color={colors.text} />
-                <ThemedText style={{ color: colors.text }}>{t('Subscription')}</ThemedText>
-              </View>
-              <IconSymbol name="chevron.right" size={16} color={colors.textTertiary} />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => router.push('/settings/notifications')} style={styles.settingRow}>
-              <View style={styles.themeOptionLeft}>
-                <IconSymbol name="bell.fill" size={20} color={colors.text} />
-                <ThemedText style={{ color: colors.text }}>{t('Notifications')}</ThemedText>
-              </View>
-              <IconSymbol name="chevron.right" size={16} color={colors.textTertiary} />
-            </TouchableOpacity>
-          </View>
-        </View>
+        <Section title={t('Settings')} icon="gearshape.fill" colors={colors}>
+          <MenuRow icon="paintbrush.fill" label={t('Appearance')} onPress={() => router.push('/settings/appearance')} colors={colors} />
+          <MenuRow icon="globe" label={t('Language')} onPress={() => router.push('/settings/language')} colors={colors} divider colorsObj={colors} />
+          <MenuRow icon="dollarsign.circle" label={t('Currency')} onPress={() => router.push('/settings/currency')} colors={colors} divider colorsObj={colors} />
+          <MenuRow icon="bell.fill" label={t('Notifications')} onPress={() => router.push('/settings/notifications')} colors={colors} divider colorsObj={colors} />
+          <MenuRow
+            icon="creditcard"
+            label={t('Subscription')}
+            onPress={() => {
+              if (!user) {
+                pushLogin('/settings/subscription');
+              } else {
+                router.push('/settings/subscription');
+              }
+            }}
+            colors={colors}
+          />
+        </Section>
 
-        {/* Activity */}
-        <View style={styles.section}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <IconSymbol name="person.crop.circle" size={18} color={colors.text} />
-            <ThemedText type="subtitle" style={[styles.sectionTitle, { color: colors.text }]}> 
-              {t('Activity')}
-            </ThemedText>
-          </View>
-          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <TouchableOpacity
-              onPress={() => {
-                if (!user) {
-                  router.push('/auth/login');
-                } else {
-                  router.push('/activity/saved');
-                }
-              }}
-              style={[styles.settingRow, { borderBottomWidth: 0.5, borderBottomColor: colors.border }]}> 
-              <View style={styles.themeOptionLeft}>
-                <IconSymbol name="bookmark.fill" size={20} color={colors.text} />
-                <ThemedText style={{ color: colors.text }}>{t('Saved')}</ThemedText>
-              </View>
-              <IconSymbol name="chevron.right" size={16} color={colors.textTertiary} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => {
-                if (!user) {
-                  router.push('/auth/login');
-                } else {
-                  router.push('/activity/your-activity');
-                }
-              }}
-              style={[styles.settingRow, { borderBottomWidth: 0.5, borderBottomColor: colors.border }]}> 
-              <View style={styles.themeOptionLeft}>
-                <IconSymbol name="clock.fill" size={20} color={colors.text} />
-                <ThemedText style={{ color: colors.text }}>{t('YourActivity')}</ThemedText>
-              </View>
-              <IconSymbol name="chevron.right" size={16} color={colors.textTertiary} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => {
-                if (!user) {
-                  router.push('/auth/login');
-                } else {
-                  router.push('/portfolio');
-                }
-              }}
-              style={[styles.settingRow, { borderBottomWidth: 0.5, borderBottomColor: colors.border }] }>
-              <View style={styles.themeOptionLeft}>
-                <IconSymbol name="chart.line.uptrend.xyaxis" size={20} color={colors.text} />
-                <ThemedText style={{ color: colors.text }}>{t('Portfolio')}</ThemedText>
-              </View>
-              <IconSymbol name="chevron.right" size={16} color={colors.textTertiary} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => {
-                if (!user) {
-                  router.push('/auth/login');
-                } else {
-                  router.push('/watchlists');
-                }
-              }}
-              style={styles.settingRow}>
-              <View style={styles.themeOptionLeft}>
-                <IconSymbol name="list.bullet.rectangle" size={20} color={colors.text} />
-                <ThemedText style={{ color: colors.text }}>{t('Watchlists')}</ThemedText>
-              </View>
-              <IconSymbol name="chevron.right" size={16} color={colors.textTertiary} />
-            </TouchableOpacity>
-          </View>
-        </View>
+        <Section title="Explore & track" icon="chart.line.uptrend.xyaxis" colors={colors}>
+          <MenuRow icon="saturn" label="Explore live market board" onPress={() => router.push('/explore')} colors={colors} divider colorsObj={colors} />
+          <MenuRow icon="bookmark.fill" label={t('Saved')} onPress={() => router.push('/activity/saved')} colors={colors} divider colorsObj={colors} />
+          <MenuRow icon="list.bullet.rectangle" label={t('Watchlists')} onPress={() => router.push('/watchlists')} colors={colors} divider colorsObj={colors} />
+          <MenuRow icon="scope" label={t('Scouters')} onPress={() => router.push('/scouters')} colors={colors} divider colorsObj={colors} />
+          <MenuRow icon="list.number" label="Top 100 rankings" onPress={() => router.push('/explore/top100')} colors={colors} />
+        </Section>
 
-        {/* Support Section */}
-        <View style={styles.section}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <IconSymbol name="info.circle.fill" size={18} color={colors.text} />
-            <ThemedText type="subtitle" style={[styles.sectionTitle, { color: colors.text }]}> 
-              {t('Support')}
-            </ThemedText>
-          </View>
-          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <TouchableOpacity onPress={() => router.push('/support/report-problem')} style={[styles.settingRow, { borderBottomWidth: 0.5, borderBottomColor: colors.border }]}>
-              <View style={styles.themeOptionLeft}>
-                <IconSymbol name="exclamationmark.bubble" size={20} color={colors.text} />
-                <ThemedText style={{ color: colors.text }}>{t('ReportProblem')}</ThemedText>
-              </View>
-              <IconSymbol name="chevron.right" size={16} color={colors.textTertiary} />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => router.push('/support/privacy-security')} style={[styles.settingRow, { borderBottomWidth: 0.5, borderBottomColor: colors.border }]}>
-              <View style={styles.themeOptionLeft}>
-                <IconSymbol name="lock.fill" size={20} color={colors.text} />
-                <ThemedText style={{ color: colors.text }}>{t('PrivacySecurityHelp')}</ThemedText>
-              </View>
-              <IconSymbol name="chevron.right" size={16} color={colors.textTertiary} />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => router.push('/support/help-center')} style={styles.settingRow}>
-              <View style={styles.themeOptionLeft}>
-                <IconSymbol name="questionmark.circle" size={20} color={colors.text} />
-                <ThemedText style={{ color: colors.text }}>{t('HelpCenter')}</ThemedText>
-              </View>
-              <IconSymbol name="chevron.right" size={16} color={colors.textTertiary} />
-            </TouchableOpacity>
-          </View>
-        </View>
+        <Section title={t('Activity')} icon="person.crop.circle" colors={colors}>
+          <MenuRow
+            icon="bookmark.fill"
+            label={t('Saved')}
+            onPress={() => {
+              if (!user) {
+                pushLogin('/activity/saved');
+              } else {
+                router.push('/activity/saved');
+              }
+            }}
+            colors={colors}
+            divider
+            colorsObj={colors}
+          />
+          <MenuRow
+            icon="clock.fill"
+            label={t('YourActivity')}
+            onPress={() => {
+              if (!user) {
+                pushLogin('/activity/your-activity');
+              } else {
+                router.push('/activity/your-activity');
+              }
+            }}
+            colors={colors}
+          />
+        </Section>
 
-        {/* About */}
-        <View style={styles.section}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <IconSymbol name="info.circle" size={18} color={colors.text} />
-            <ThemedText type="subtitle" style={[styles.sectionTitle, { color: colors.text }]}> 
-              {t('About')}
-            </ThemedText>
-          </View>
-          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <TouchableOpacity onPress={() => router.push('/about/privacy-policy')} style={[styles.settingRow, { borderBottomWidth: 0.5, borderBottomColor: colors.border }]}>
-              <View style={styles.themeOptionLeft}>
-                <IconSymbol name="lock" size={20} color={colors.text} />
-                <ThemedText style={{ color: colors.text }}>{t('PrivacyPolicy')}</ThemedText>
-              </View>
-              <IconSymbol name="chevron.right" size={16} color={colors.textTertiary} />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => router.push('/about/terms-of-use')} style={styles.settingRow}>
-              <View style={styles.themeOptionLeft}>
-                <IconSymbol name="doc.text" size={20} color={colors.text} />
-                <ThemedText style={{ color: colors.text }}>{t('TermsOfUse')}</ThemedText>
-              </View>
-              <IconSymbol name="chevron.right" size={16} color={colors.textTertiary} />
-            </TouchableOpacity>
-          </View>
-        </View>
+        <Section title={t('Support')} icon="info.circle.fill" colors={colors}>
+          <MenuRow icon="exclamationmark.bubble" label={t('ReportProblem')} onPress={() => router.push('/support/report-problem')} colors={colors} divider colorsObj={colors} />
+          <MenuRow icon="lock.fill" label={t('PrivacySecurityHelp')} onPress={() => router.push('/support/privacy-security')} colors={colors} divider colorsObj={colors} />
+          <MenuRow icon="questionmark.circle" label={t('HelpCenter')} onPress={() => router.push('/support/help-center')} colors={colors} />
+        </Section>
 
-        {/* App Info */}
+        <Section title={t('About')} icon="info.circle" colors={colors}>
+          <MenuRow icon="lock" label={t('PrivacyPolicy')} onPress={() => router.push('/about/privacy-policy')} colors={colors} divider colorsObj={colors} />
+          <MenuRow icon="doc.text" label={t('TermsOfUse')} onPress={() => router.push('/about/terms-of-use')} colors={colors} />
+        </Section>
+
         <View style={{ alignItems: 'center', paddingVertical: 20 }}>
           <ThemedText style={{ color: colors.textTertiary, fontSize: 12 }}>yoink v1.0.0</ThemedText>
-          <ThemedText style={{ color: colors.textTertiary, fontSize: 11, marginTop: 4 }}>Hype-aware. Signal-first.</ThemedText>
+          <ThemedText style={{ color: colors.textTertiary, fontSize: 11, marginTop: 4 }}>Crypto intelligence. Signal first.</ThemedText>
         </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
+function Section({
+  title,
+  icon,
+  colors,
+  children,
+}: {
+  title: string;
+  icon: any;
+  colors: any;
+  children: React.ReactNode;
+}) {
+  return (
+    <View style={styles.section}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <IconSymbol name={icon} size={18} color={colors.text} />
+        <ThemedText type="subtitle" style={[styles.sectionTitle, { color: colors.text }]}>
+          {title}
+        </ThemedText>
+      </View>
+      <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>{children}</View>
+    </View>
+  );
+}
+
+function MenuRow({
+  icon,
+  label,
+  onPress,
+  colors,
+  divider = false,
+  colorsObj,
+}: {
+  icon: any;
+  label: string;
+  onPress: () => void;
+  colors: any;
+  divider?: boolean;
+  colorsObj?: any;
+}) {
+  return (
+    <TouchableOpacity onPress={onPress} style={[styles.settingRow, divider ? { borderBottomWidth: 0.5, borderBottomColor: colorsObj.border } : null]}>
+      <View style={styles.rowLeft}>
+        <IconSymbol name={icon} size={20} color={colors.text} />
+        <ThemedText style={{ color: colors.text }}>{label}</ThemedText>
+      </View>
+      <IconSymbol name="chevron.right" size={16} color={colors.textTertiary} />
+    </TouchableOpacity>
+  );
+}
+
+function StatCard({ label, value, detail, colors }: { label: string; value: string; detail: string; colors: any }) {
+  return (
+    <View style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }]}> 
+      <ThemedText style={{ color: colors.textSecondary, fontSize: 12 }}>{label}</ThemedText>
+      <ThemedText style={{ color: colors.text, fontSize: 22, fontWeight: '700', marginTop: 8 }}>{value}</ThemedText>
+      <ThemedText style={{ color: colors.textSecondary, fontSize: 12, marginTop: 4 }}>{detail}</ThemedText>
+    </View>
+  );
+}
+
+function StatusRow({ icon, text, tone, colors }: { icon: any; text: string; tone: string; colors: any }) {
+  return (
+    <View style={styles.statusRow}>
+      <IconSymbol name={icon} size={16} color={tone} />
+      <ThemedText style={{ color: colors.textSecondary, fontSize: 13 }}>{text}</ThemedText>
+    </View>
+  );
+}
+
+function formatRelativeTime(iso: string) {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const diffMinutes = Math.max(0, Math.round(diffMs / 60000));
+  if (diffMinutes < 1) return 'just now';
+  if (diffMinutes < 60) return `${diffMinutes}m ago`;
+  const diffHours = Math.round(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+  const diffDays = Math.round(diffHours / 24);
+  return `${diffDays}d ago`;
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  header: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 12,
-  },
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    height: 36,
-    borderRadius: 10,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 13,
-    paddingVertical: 0,
   },
   content: {
     padding: 16,
     gap: 16,
   },
-  actionsRow: {
+  header: {
+    gap: 4,
+  },
+  subtitle: {
+    fontSize: 14,
+  },
+  accountCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 14,
+    gap: 14,
+  },
+  accountRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  accountTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  avatar: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pill: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  primaryButton: {
+    borderRadius: 999,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
     flexDirection: 'row',
     gap: 8,
   },
-  actionCard: {
-    flex: 1,
-    padding: 12,
-    borderRadius: 10,
-    borderWidth: 1,
+  secondaryButton: {
+    borderRadius: 999,
+    paddingVertical: 12,
     alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    borderWidth: 1,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  statCard: {
+    width: '47%',
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 14,
+  },
+  infoCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 14,
+  },
+  statusList: {
+    gap: 10,
+    marginTop: 12,
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
   section: {
     gap: 12,
@@ -384,118 +400,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     overflow: 'hidden',
   },
-  accountRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    padding: 14,
-  },
-  avatar: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  accountInfo: {
-    flex: 1,
-  },
-  freeBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    borderWidth: 1,
-  },
-  logoutButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    alignSelf: 'flex-start',
-    marginLeft: 14,
-    marginBottom: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-    borderWidth: 1,
-  },
-  walletBalance: {
-    padding: 14,
-    marginTop: 1,
-  },
-  coinIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  statsRowInside: {
-    flexDirection: 'row',
-    gap: 6,
-    paddingHorizontal: 14,
-    paddingTop: 10,
-  },
-  statMiniInside: {
-    flex: 1,
-    padding: 8,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  actionButtonsInside: {
-    flexDirection: 'row',
-    gap: 8,
-    paddingHorizontal: 14,
-    paddingTop: 10,
-    paddingBottom: 12,
-  },
-  primaryButtonInside: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 10,
-    borderRadius: 10,
-  },
-  secondaryButtonInside: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 10,
-    borderRadius: 10,
-    borderWidth: 1.5,
-  },
-  buttonTextSmall: {
-    fontWeight: '600',
-    fontSize: 13,
-  },
-  buttonText: {
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  themeRow: {
-    flexDirection: 'row',
-    gap: 6,
-  },
-  themeButton: {
-    flex: 1,
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  themeOptionLeft: {
+  rowLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,

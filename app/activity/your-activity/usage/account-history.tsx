@@ -1,15 +1,24 @@
+import { ActivityEventList } from '@/components/activity-event-list';
+import { useActivity } from '@/contexts/activity-context';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/contexts/theme-context';
-import { ThemedText } from '@/components/themed-text';
-import { View } from 'react-native';
 
 export default function AccountHistoryScreen() {
   const { colors } = useTheme();
+  const { events } = useActivity();
+  const accountEvents = events.filter((event) =>
+    ['signed_in', 'signed_out', 'save_coin', 'unsave_coin'].includes(event.eventType)
+  );
+
   return (
     <SafeAreaView edges={["top","left","right"]} style={{ flex: 1, backgroundColor: colors.background }}>
-      <View style={{ padding: 16 }}>
-        <ThemedText type="title" style={{ color: colors.text, fontSize: 18 }}>Account History</ThemedText>
-      </View>
+      <ActivityEventList
+        title="Account history"
+        subtitle="Session changes and watchlist changes on this device."
+        events={accountEvents}
+        emptyTitle="No account history yet"
+        emptyBody="Sign in or save a coin to start building account activity."
+      />
     </SafeAreaView>
   );
 }

@@ -5,9 +5,11 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Platform, StyleSheet, View } from 'react-native';
 
+import { ActivityProvider } from '@/contexts/activity-context';
 import { AuthProvider } from '@/contexts/auth-context';
 import { SettingsProvider } from '@/contexts/settings-context';
 import { ThemeProvider, useTheme } from '@/contexts/theme-context';
+import { WatchlistProvider } from '@/contexts/watchlist-context';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -23,6 +25,7 @@ function RootLayoutNav() {
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="auth/login" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="auth/update-password" options={{ presentation: 'modal' }} />
           <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
         </Stack>
       </View>
@@ -36,7 +39,11 @@ export default function RootLayout() {
     <SettingsProvider>
       <ThemeProvider>
         <AuthProvider>
-          <RootLayoutNav />
+          <ActivityProvider>
+            <WatchlistProvider>
+              <RootLayoutNav />
+            </WatchlistProvider>
+          </ActivityProvider>
         </AuthProvider>
       </ThemeProvider>
     </SettingsProvider>

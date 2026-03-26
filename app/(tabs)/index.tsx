@@ -11,11 +11,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 // Mock Mini Chart Component (SVG placeholder)
 function MiniChart({ isPositive, color }: { isPositive: boolean; color: string }) {
-  // Mock data points for a simple line chart
-  const points = isPositive 
-    ? "0,20 10,18 20,15 30,12 40,8 50,5"  // Upward trend
-    : "0,5 10,8 20,12 30,15 40,18 50,20"; // Downward trend
-  
   return (
     <View style={{ width: 50, height: 24 }}>
       {/* Simple polyline representation using View - will be replaced with actual SVG */}
@@ -361,7 +356,6 @@ export default function HomeScreen() {
           {tab === 'yoink' && (() => {
             const topGainer = baseData.yoink.reduce((max, stock) => parseFloat(stock.change) > parseFloat(max.change) ? stock : max, baseData.yoink[0]);
             const topLoser = baseData.yoink.reduce((min, stock) => parseFloat(stock.change) < parseFloat(min.change) ? stock : min, baseData.yoink[0]);
-            const isLoserNegative = parseFloat(topLoser.change) < 0;
             return (
               <View style={styles.statsContent}>
                 <View style={styles.statItem}>
@@ -399,6 +393,7 @@ export default function HomeScreen() {
               key={`${tab}-${stock.symbol}-first`}
               style={[styles.watchlistRow, { backgroundColor: colors.background, borderBottomColor: colors.border }]}
               disabled={!visible}
+              onPress={visible ? () => router.push({ pathname: '/coin/[symbol]' as any, params: { symbol: stock.symbol } }) : undefined}
             >
               <View style={styles.symbolSection}>
                 <ThemedText style={{ color: colors.text, fontWeight: '600', fontSize: 16, opacity: visible ? 1 : 0.6 }}>
@@ -447,6 +442,7 @@ export default function HomeScreen() {
                 key={`${tab}-${stock.symbol}-rest`}
                 style={[styles.watchlistRow, { backgroundColor: colors.background, borderBottomColor: colors.border }]}
                 disabled={!visible}
+                onPress={visible ? () => router.push({ pathname: '/coin/[symbol]' as any, params: { symbol: stock.symbol } }) : undefined}
               >
                 <View style={styles.symbolSection}>
                   <ThemedText style={{ color: colors.text, fontWeight: '600', fontSize: 16, opacity: visible ? 1 : 0.6 }}>
@@ -796,14 +792,12 @@ const segmentStyles = StyleSheet.create({
 function MarketsSection({ colors, showHeader = true }: { colors: any; showHeader?: boolean }) {
   const { t } = useSettings();
   const [coinsData, setCoinsData] = useState<any[]>([]);
-  const [coinsLoading, setCoinsLoading] = useState(false);
 
   useEffect(() => {
     let active = true;
 
     const loadCoins = async () => {
       try {
-        setCoinsLoading(true);
         const { data, error } = await supabase
           .from('coin_latest_view')
           .select('symbol, name, price_usd, change_24h_pct, rank')
@@ -822,10 +816,6 @@ function MarketsSection({ colors, showHeader = true }: { colors: any; showHeader
         if (!active) return;
         console.warn('[markets] Unexpected error loading coins', err?.message ?? err);
         setCoinsData([]);
-      } finally {
-        if (active) {
-          setCoinsLoading(false);
-        }
       }
     };
 
@@ -869,6 +859,7 @@ function MarketsSection({ colors, showHeader = true }: { colors: any; showHeader
                 const change = row.change_24h_pct != null ? Number(row.change_24h_pct) : null;
                 const isPositive = change == null ? true : change >= 0;
                 return {
+                  symbol: row.symbol,
                   name: row.name ?? row.symbol,
                   value:
                     price != null
@@ -902,7 +893,11 @@ function MarketsSection({ colors, showHeader = true }: { colors: any; showHeader
                 const isPositive = item.positive;
                 const changeColor = isPositive ? colors.success : colors.danger;
                 return (
-                  <View key={idx} style={[marketStyles.marketCard, { backgroundColor: colors.surface, borderColor: colors.border }]}> 
+                  <TouchableOpacity
+                    key={idx}
+                    style={[marketStyles.marketCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                    onPress={() => item.symbol && router.push({ pathname: '/coin/[symbol]' as any, params: { symbol: item.symbol } })}
+                  > 
                     <ThemedText style={{ color: colors.text, fontSize: 13, fontWeight: '600' }} numberOfLines={1}>
                       {item.name}
                     </ThemedText>
@@ -912,7 +907,7 @@ function MarketsSection({ colors, showHeader = true }: { colors: any; showHeader
                     <ThemedText style={{ color: changeColor, fontSize: 12, fontWeight: '600', marginTop: 4 }}>
                       {item.change}
                     </ThemedText>
-                  </View>
+                  </TouchableOpacity>
                 );
               })}
             </ScrollView>

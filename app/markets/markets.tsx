@@ -1,104 +1,58 @@
+import { router, useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
 import { ThemedText } from '@/components/themed-text';
+import { CoinSparkline } from '@/components/ui/coin-sparkline';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useSettings } from '@/contexts/settings-context';
 import { useTheme } from '@/contexts/theme-context';
-import { router, useLocalSearchParams } from 'expo-router';
-import { useRef, useState } from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-
-// Mini Chart Component
-function MiniChart({ isPositive, color }: { isPositive: boolean; color: string }) {
-  return (
-    <View style={{ width: 50, height: 24 }}>
-      <View style={{ 
-        width: '100%', 
-        height: '100%', 
-        borderBottomWidth: 2, 
-        borderBottomColor: color,
-        borderRightWidth: 2,
-        borderRightColor: color,
-        opacity: 0.6,
-        transform: isPositive ? [{ scaleY: -1 }] : []
-      }} />
-    </View>
-  );
-}
-
-type CategoryType = 'indices' | 'commodities' | 'futures' | 'currencies' | 'coins' | 'bonds';
+import { useWatchlist } from '@/contexts/watchlist-context';
+import { CoinMarketRow, MarketSortMode, fetchCoinMarketRows, formatCoinPercent, formatCoinPrice, getChangeForRange, getLatestTimestamp, sortCoinRows } from '@/utils/coin-market';
 
 export default function MarketsScreen() {
   const { colors } = useTheme();
   const { t } = useSettings();
+  const { isSaved, toggleSaved } = useWatchlist();
   const params = useLocalSearchParams<{ category?: string }>();
-  const [activeCategory, setActiveCategory] = useState<CategoryType>((params.category as CategoryType) || 'indices');
-  const scrollViewRef = useRef<ScrollView>(null);
 
-  const categories = [
-    { id: 'indices' as CategoryType, title: t('Indices') },
-    { id: 'commodities' as CategoryType, title: t('Commodities') },
-    { id: 'futures' as CategoryType, title: t('Futures') },
-    { id: 'currencies' as CategoryType, title: t('Currencies') },
-    { id: 'coins' as CategoryType, title: t('Coins') },
-    { id: 'bonds' as CategoryType, title: t('Bonds') },
-  ];
+  const [sortMode, setSortMode] = useState<MarketSortMode>(params.category === 'coins' ? 'popular' : 'popular');
+  const [rows, setRows] = useState<CoinMarketRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const marketData: Record<CategoryType, any[]> = {
-    indices: [
-      { name: 'S&P 500', value: '4,783.45', change: '+1.2%', positive: true },
-      { name: 'Dow Jones', value: '37,545.33', change: '+0.8%', positive: true },
-      { name: 'NASDAQ', value: '14,843.77', change: '-0.3%', positive: false },
-      { name: 'Russell 2000', value: '2,043.12', change: '+0.5%', positive: true },
-      { name: 'FTSE 100', value: '7,512.45', change: '+0.2%', positive: true },
-      { name: 'DAX', value: '16,754.32', change: '+0.6%', positive: true },
-      { name: 'Nikkei 225', value: '33,464.17', change: '+1.1%', positive: true },
-      { name: 'Hang Seng', value: '16,334.87', change: '-0.4%', positive: false },
-    ],
-    commodities: [
-      { name: 'Gold', value: '2,043.50', change: '+0.5%', positive: true },
-      { name: 'Silver', value: '23.14', change: '-0.2%', positive: false },
-      { name: 'Crude Oil', value: '73.25', change: '+1.8%', positive: true },
-      { name: 'Natural Gas', value: '2.54', change: '-1.2%', positive: false },
-      { name: 'Copper', value: '3.85', change: '+0.3%', positive: true },
-      { name: 'Platinum', value: '915.40', change: '+0.7%', positive: true },
-    ],
-    futures: [
-      { name: 'E-mini S&P', value: '4,785.00', change: '+0.9%', positive: true },
-      { name: 'E-mini Nasdaq', value: '16,432.50', change: '+1.1%', positive: true },
-      { name: 'Crude Oil', value: '73.50', change: '+0.4%', positive: true },
-      { name: 'Gold', value: '2,045.20', change: '+0.6%', positive: true },
-      { name: 'Corn', value: '475.25', change: '-0.8%', positive: false },
-      { name: 'Soybeans', value: '1,245.50', change: '+0.2%', positive: true },
-    ],
-    currencies: [
-      { name: 'EUR/USD', value: '1.0845', change: '-0.1%', positive: false },
-      { name: 'GBP/USD', value: '1.2654', change: '+0.3%', positive: true },
-      { name: 'USD/JPY', value: '148.25', change: '+0.6%', positive: true },
-      { name: 'AUD/USD', value: '0.6543', change: '+0.2%', positive: true },
-      { name: 'USD/CAD', value: '1.3654', change: '-0.1%', positive: false },
-      { name: 'USD/CHF', value: '0.8754', change: '+0.4%', positive: true },
-    ],
-    coins: [
-      { name: 'Bitcoin', value: '42,450', change: '+2.4%', positive: true },
-      { name: 'Ethereum', value: '2,245', change: '+1.8%', positive: true },
-      { name: 'Solana', value: '102.50', change: '+5.2%', positive: true },
-      { name: 'BNB', value: '315.40', change: '+3.1%', positive: true },
-      { name: 'XRP', value: '0.625', change: '+1.5%', positive: true },
-      { name: 'Cardano', value: '0.485', change: '-2.3%', positive: false },
-      { name: 'Avalanche', value: '36.25', change: '+4.2%', positive: true },
-      { name: 'Polygon', value: '0.825', change: '+2.8%', positive: true },
-    ],
-    bonds: [
-      { name: 'US 10Y', value: '4.125%', change: '+0.02%', positive: true },
-      { name: 'US 30Y', value: '4.325%', change: '+0.01%', positive: true },
-      { name: 'US 2Y', value: '4.485%', change: '-0.03%', positive: false },
-      { name: 'US 5Y', value: '4.245%', change: '+0.01%', positive: true },
-      { name: 'Germany 10Y', value: '2.185%', change: '+0.02%', positive: true },
-      { name: 'UK 10Y', value: '3.925%', change: '-0.01%', positive: false },
-    ],
-  };
+  const loadRows = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await fetchCoinMarketRows(120);
+      setRows(data);
+    } catch (err: any) {
+      setRows([]);
+      setError(err?.message ?? 'Failed to load markets.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  const currentData = marketData[activeCategory];
+  useEffect(() => {
+    loadRows();
+  }, [loadRows]);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    loadRows().finally(() => setRefreshing(false));
+  }, [loadRows]);
+
+  const displayedRows = useMemo(() => sortCoinRows(rows, sortMode, '1d').slice(0, 50), [rows, sortMode]);
+  const leaders = useMemo(() => ({
+    marketLeader: sortCoinRows(rows, 'popular', '1d')[0] ?? null,
+    topGainer: sortCoinRows(rows, 'gainers', '1d')[0] ?? null,
+    topLoser: sortCoinRows(rows, 'losers', '1d')[0] ?? null,
+  }), [rows]);
+  const lastUpdated = useMemo(() => getLatestTimestamp(rows), [rows]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -110,72 +64,117 @@ export default function MarketsScreen() {
         <View style={{ width: 24 }} />
       </View>
 
-      {/* Horizontal Scrollable Segment */}
       <ScrollView
-        ref={scrollViewRef}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.segmentScroll}
-        contentContainerStyle={styles.segmentContent}
+        contentContainerStyle={styles.content}
+        refreshControl={(
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+            titleColor={colors.primary}
+            colors={[colors.primary]}
+            progressBackgroundColor={colors.surface}
+          />
+        )}
       >
-        {categories.map((category) => (
-          <TouchableOpacity
-            key={category.id}
-            onPress={() => setActiveCategory(category.id)}
-            style={[
-              styles.segmentBtn,
-              {
-                backgroundColor: activeCategory === category.id ? colors.primary : colors.surface,
-                borderColor: activeCategory === category.id ? colors.primary : colors.border,
-              },
-            ]}
-          >
-            <ThemedText
+        <View style={[styles.infoCard, { backgroundColor: colors.surface, borderColor: colors.border }]}> 
+          <ThemedText style={{ color: colors.text, fontWeight: '700' }}>Crypto-only market board</ThemedText>
+          <ThemedText style={{ color: colors.textSecondary, marginTop: 6, lineHeight: 20 }}>
+            Yoink is focusing this screen on live crypto data from Supabase instead of mixed stocks, bonds, and commodities. Last update: {lastUpdated ? new Date(lastUpdated).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}.
+          </ThemedText>
+        </View>
+
+        <View style={styles.summaryGrid}>
+          <SummaryCard
+            label="Leader"
+            value={leaders.marketLeader?.symbol ?? '--'}
+            detail={leaders.marketLeader ? `#${leaders.marketLeader.rank ?? '--'} · ${formatCoinPrice(leaders.marketLeader.price_usd)}` : '--'}
+            colors={colors}
+          />
+          <SummaryCard
+            label={t('Gainers')}
+            value={leaders.topGainer?.symbol ?? '--'}
+            detail={leaders.topGainer ? formatCoinPercent(getChangeForRange(leaders.topGainer, '1d')) : '--'}
+            colors={colors}
+          />
+          <SummaryCard
+            label={t('Losers')}
+            value={leaders.topLoser?.symbol ?? '--'}
+            detail={leaders.topLoser ? formatCoinPercent(getChangeForRange(leaders.topLoser, '1d')) : '--'}
+            colors={colors}
+          />
+          <SummaryCard
+            label="Tracked"
+            value={`${rows.length}`}
+            detail="coins"
+            colors={colors}
+          />
+        </View>
+
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.segmentScroll} contentContainerStyle={styles.segmentContent}>
+          {[
+            { key: 'popular' as const, title: t('Popular') },
+            { key: 'volume' as const, title: t('Volume') },
+            { key: 'gainers' as const, title: t('Gainers') },
+            { key: 'losers' as const, title: t('Losers') },
+          ].map((option) => (
+            <TouchableOpacity
+              key={option.key}
+              onPress={() => setSortMode(option.key)}
               style={[
-                styles.segmentText,
-                { color: activeCategory === category.id ? colors.primaryText : colors.text },
+                styles.segmentBtn,
+                {
+                  backgroundColor: sortMode === option.key ? colors.primary : colors.surface,
+                  borderColor: sortMode === option.key ? colors.primary : colors.border,
+                },
               ]}
             >
-              {category.title}
-            </ThemedText>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+              <ThemedText style={{ fontWeight: '600', fontSize: 14, color: sortMode === option.key ? colors.primaryText : colors.text }}>
+                {option.title}
+              </ThemedText>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
 
-      {/* Market Items List */}
-      <ScrollView contentContainerStyle={styles.listContainer}>
-        {currentData.map((item, idx) => {
-          const isPositive = item.positive;
-          const changeColor = isPositive ? colors.success : colors.danger;
+        {loading ? (
+          <View style={styles.centerState}>
+            <ActivityIndicator color={colors.primary} />
+            <ThemedText style={{ color: colors.textSecondary, marginTop: 12 }}>Loading markets…</ThemedText>
+          </View>
+        ) : null}
+
+        {!loading && error ? (
+          <View style={[styles.infoCard, { backgroundColor: colors.surface, borderColor: colors.border }]}> 
+            <ThemedText style={{ color: colors.danger, fontWeight: '700' }}>Could not load markets</ThemedText>
+            <ThemedText style={{ color: colors.textSecondary, marginTop: 6 }}>{error}</ThemedText>
+          </View>
+        ) : null}
+
+        {!loading && !error && displayedRows.map((item, idx) => {
+          const change = getChangeForRange(item, '1d');
+          const changeColor = (change ?? 0) >= 0 ? colors.success : colors.danger;
+          const saved = isSaved(item.symbol);
           return (
             <TouchableOpacity
-              key={idx}
-              style={[
-                styles.marketRow,
-                { backgroundColor: colors.background, borderBottomColor: colors.border },
-              ]}
+              key={item.symbol}
+              style={[styles.marketRow, { backgroundColor: colors.background, borderBottomColor: colors.border }]}
+              onPress={() => router.push({ pathname: '/coin/[symbol]' as any, params: { symbol: item.symbol } })}
             >
-              {/* Left: Name */}
+              <ThemedText style={{ color: colors.textSecondary, width: 24, textAlign: 'right' }}>{idx + 1}</ThemedText>
               <View style={styles.nameSection}>
-                <ThemedText style={{ color: colors.text, fontWeight: '600', fontSize: 16 }}>
-                  {item.name}
-                </ThemedText>
+                <ThemedText style={{ color: colors.text, fontWeight: '600', fontSize: 16 }}>{item.symbol}</ThemedText>
+                <ThemedText style={{ color: colors.textSecondary, fontSize: 12, marginTop: 2 }} numberOfLines={1}>{item.name}</ThemedText>
               </View>
-
-              {/* Center: Mini Chart */}
               <View style={styles.chartSection}>
-                <MiniChart isPositive={isPositive} color={changeColor} />
+                <CoinSparkline symbol={item.symbol} color={changeColor} width={72} height={28} />
               </View>
-
-              {/* Right: Value & Change */}
               <View style={styles.valueSection}>
-                <ThemedText style={{ color: colors.text, fontWeight: '600', fontSize: 15 }}>
-                  {item.value}
-                </ThemedText>
-                <ThemedText style={{ color: changeColor, fontWeight: '700', fontSize: 13, marginTop: 2 }}>
-                  {item.change}
-                </ThemedText>
+                <ThemedText style={{ color: colors.text, fontWeight: '600', fontSize: 15 }}>{formatCoinPrice(item.price_usd)}</ThemedText>
+                <ThemedText style={{ color: changeColor, fontWeight: '700', fontSize: 13, marginTop: 2 }}>{formatCoinPercent(change)}</ThemedText>
               </View>
+              <TouchableOpacity style={{ padding: 6, marginLeft: 8 }} onPress={() => toggleSaved(item.symbol)}>
+                <IconSymbol name={saved ? 'bookmark.fill' : 'bookmark'} size={18} color={saved ? colors.primary : colors.textTertiary} />
+              </TouchableOpacity>
             </TouchableOpacity>
           );
         })}
@@ -184,10 +183,19 @@ export default function MarketsScreen() {
   );
 }
 
+function SummaryCard({ label, value, detail, colors }: { label: string; value: string; detail: string; colors: any }) {
+  return (
+    <View style={[styles.summaryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}> 
+      <ThemedText style={{ color: colors.textSecondary, fontSize: 12 }}>{label}</ThemedText>
+      <ThemedText style={{ color: colors.text, fontSize: 20, fontWeight: '700', marginTop: 8 }}>{value}</ThemedText>
+      <ThemedText style={{ color: colors.textSecondary, fontSize: 12, marginTop: 4 }} numberOfLines={2}>{detail}</ThemedText>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: { flex: 1 },
+  content: { paddingBottom: 16 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -202,12 +210,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  infoCard: {
+    borderWidth: 1,
+    borderRadius: 14,
+    marginHorizontal: 16,
+    padding: 14,
+    marginBottom: 16,
+  },
+  summaryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
+  summaryCard: {
+    width: '47%',
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 14,
+  },
   segmentScroll: {
     maxHeight: 56,
     marginBottom: 12,
   },
   segmentContent: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     gap: 8,
     paddingVertical: 8,
   },
@@ -219,34 +247,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  segmentText: {
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  listContainer: {
-    paddingHorizontal: 0,
-    paddingVertical: 8,
+  centerState: {
+    paddingVertical: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   marketRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 0.5,
+    gap: 8,
   },
   nameSection: {
     flex: 1,
     justifyContent: 'center',
   },
   chartSection: {
-    width: 60,
+    width: 76,
     alignItems: 'center',
     justifyContent: 'center',
-    marginHorizontal: 8,
   },
   valueSection: {
     alignItems: 'flex-end',
-    minWidth: 100,
+    minWidth: 92,
   },
 });

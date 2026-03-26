@@ -1,38 +1,250 @@
+import { router } from 'expo-router';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Platform, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
 import { ThemedText } from '@/components/themed-text';
+import { CoinSparkline } from '@/components/ui/coin-sparkline';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useSettings } from '@/contexts/settings-context';
 import { useTheme } from '@/contexts/theme-context';
-import React, { useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useWatchlist } from '@/contexts/watchlist-context';
+import { supabase } from '@/utils/supabase';
+import { CoinMarketRow, fetchCoinMarketRows, formatCoinPercent, formatCoinPrice, getLatestTimestamp } from '@/utils/coin-market';
+
+type WhaleMetricRow = {
+  coin_id: string;
+  whale_net_flow_usd: number | null;
+  top_traders_count: number | null;
+  ts: string;
+};
+
+type LiveScouterMatch = {
+  symbol: string;
+  name: string;
+  coinId?: string;
+  price: string;
+  primaryMetric: string;
+  secondaryMetric: string;
+  changePct: number | null;
+  score: number;
+};
+
+type LiveScouter = {
+  id: string;
+  name: string;
+  criteria: string;
+  note: string;
+  matches: LiveScouterMatch[];
+  available: boolean;
+};
 
 export default function ScoutersScreen() {
   const { colors } = useTheme();
   const { t } = useSettings();
+  const { isSaved, toggleSaved } = useWatchlist();
   const [refreshing, setRefreshing] = useState(false);
-  
-  const scouters = [
-    { id: 1, name: 'Meme Rockets', active: true, matches: 12, lastRun: '5m ago', criteria: 'Meme coins +20% 24h, Volume > $5M' },
-    { id: 2, name: 'Micro Caps', active: false, matches: 8, lastRun: '2h ago', criteria: 'MC < $20M, +15% 24h' },
-    { id: 3, name: 'On-chain Volume Spikes', active: true, matches: 24, lastRun: '1m ago', criteria: 'DEX Vol 5x avg, Momentum +' },
-    { id: 4, name: 'New L1/L2 Breakouts', active: true, matches: 6, lastRun: '10m ago', criteria: 'New listings, +10% 1h' },
-    { id: 5, name: 'ETF Narrative', active: false, matches: 3, lastRun: '1d ago', criteria: 'BTC/ETH ecosystem coins + Flow' },
-  ];
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [marketRows, setMarketRows] = useState<CoinMarketRow[]>([]);
+  const [whaleRows, setWhaleRows] = useState<WhaleMetricRow[]>([]);
+  const [selectedScouterId, setSelectedScouterId] = useState<string>('momentum');
+  const scrollRef = useRef<ScrollView>(null);
+  const matchesSectionRef = useRef<View | null>(null);
 
-  const recentMatches = [
-    { symbol: 'PEPE', scouter: 'Meme Rockets', change: '+24.3%', positive: true, time: '2m ago' },
-    { symbol: 'WIF', scouter: 'On-chain Volume Spikes', change: '+18.7%', positive: true, time: '5m ago' },
-    { symbol: 'BTC', scouter: 'New L1/L2 Breakouts', change: '+3.2%', positive: true, time: '12m ago' },
-  ];
+  const loadData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
 
-  const templates = [
-    { id: 1, name: 'Meme Rush', description: 'Meme coins with volume + social buzz' },
-    { id: 2, name: 'DeFi Momentum', description: 'DeFi tokens with rising TVL & price' },
-    { id: 3, name: 'Whale Follows', description: 'Coins bought by top traders/whales' },
-  ];
-  
+      const [markets, whaleResponse] = await Promise.all([
+        fetchCoinMarketRows(120),
+        supabase
+          .from('coin_whale_metrics')
+          .select('coin_id, whale_net_flow_usd, top_traders_count, ts')
+          .order('ts', { ascending: false })
+          .limit(200),
+      ]);
+
+      setMarketRows(markets);
+
+      if (whaleResponse.error) {
+        setWhaleRows([]);
+      } else {
+        const latestByCoin = new Map<string, WhaleMetricRow>();
+        for (const row of (whaleResponse.data ?? []) as WhaleMetricRow[]) {
+          if (!row.coin_id) continue;
+          if (!latestByCoin.has(row.coin_id)) {
+            latestByCoin.set(row.coin_id, row);
+          }
+        }
+        setWhaleRows(Array.from(latestByCoin.values()));
+      }
+    } catch (err: any) {
+      setMarketRows([]);
+      setWhaleRows([]);
+      setError(err?.message ?? 'Failed to load live scouters.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    loadData().finally(() => setRefreshing(false));
+  }, [loadData]);
+
+  const scouters = useMemo<LiveScouter[]>(() => {
+    const rows = marketRows;
+    const whaleByCoinId = new Map(whaleRows.map((row) => [row.coin_id, row]));
+
+    const momentumMatches = rows
+      .filter((row) => (row.change_1h_pct ?? -999) >= 1.2 && (row.change_24h_pct ?? -999) >= 4)
+      .sort((a, b) => ((b.change_1h_pct ?? 0) + (b.change_24h_pct ?? 0)) - ((a.change_1h_pct ?? 0) + (a.change_24h_pct ?? 0)))
+      .slice(0, 8)
+      .map<LiveScouterMatch>((row) => ({
+        symbol: row.symbol,
+        name: row.name,
+        coinId: row.coin_id,
+        price: formatCoinPrice(row.price_usd),
+        primaryMetric: `1h ${formatCoinPercent(row.change_1h_pct)}`,
+        secondaryMetric: `24h ${formatCoinPercent(row.change_24h_pct)}`,
+        changePct: row.change_24h_pct,
+        score: (row.change_1h_pct ?? 0) + (row.change_24h_pct ?? 0),
+      }));
+
+    const volumeMatches = rows
+      .filter((row) => (row.volume_24h_usd ?? 0) > 0 && (row.change_24h_pct ?? -999) >= 0.5)
+      .sort((a, b) => (b.volume_24h_usd ?? 0) - (a.volume_24h_usd ?? 0))
+      .slice(0, 8)
+      .map<LiveScouterMatch>((row) => ({
+        symbol: row.symbol,
+        name: row.name,
+        coinId: row.coin_id,
+        price: formatCoinPrice(row.price_usd),
+        primaryMetric: `Vol ${formatCompactDollars(row.volume_24h_usd)}`,
+        secondaryMetric: `24h ${formatCoinPercent(row.change_24h_pct)}`,
+        changePct: row.change_24h_pct,
+        score: row.volume_24h_usd ?? 0,
+      }));
+
+    const breakoutMatches = rows
+      .filter((row) => (row.rank ?? 999) >= 15 && (row.rank ?? 999) <= 100 && (row.change_24h_pct ?? -999) >= 7)
+      .sort((a, b) => (b.change_24h_pct ?? 0) - (a.change_24h_pct ?? 0))
+      .slice(0, 8)
+      .map<LiveScouterMatch>((row) => ({
+        symbol: row.symbol,
+        name: row.name,
+        coinId: row.coin_id,
+        price: formatCoinPrice(row.price_usd),
+        primaryMetric: `24h ${formatCoinPercent(row.change_24h_pct)}`,
+        secondaryMetric: `Rank #${row.rank ?? '--'}`,
+        changePct: row.change_24h_pct,
+        score: row.change_24h_pct ?? 0,
+      }));
+
+    const whaleMatches: LiveScouterMatch[] = rows.reduce<LiveScouterMatch[]>((acc, row) => {
+      const whale = row.coin_id ? whaleByCoinId.get(row.coin_id) : undefined;
+      if (!whale) return acc;
+      if ((whale.whale_net_flow_usd ?? 0) <= 0) return acc;
+
+      acc.push({
+        symbol: row.symbol,
+        name: row.name,
+        coinId: row.coin_id,
+        price: formatCoinPrice(row.price_usd),
+        primaryMetric: `Net ${formatCompactDollars(whale.whale_net_flow_usd)}`,
+        secondaryMetric: `${whale.top_traders_count ?? 0} top traders`,
+        changePct: row.change_24h_pct,
+        score: whale.whale_net_flow_usd ?? 0,
+      });
+
+      return acc;
+    }, [])
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 8);
+
+    return [
+      {
+        id: 'momentum',
+        name: 'Momentum Pulse',
+        criteria: '+1.2% in 1h and +4% in 24h',
+        note: 'Fast movers that are still holding their daily trend.',
+        matches: momentumMatches,
+        available: rows.length > 0,
+      },
+      {
+        id: 'volume',
+        name: 'Volume Spike',
+        criteria: 'High 24h volume with positive daily trend',
+        note: 'The highest-liquidity names that are already moving.',
+        matches: volumeMatches,
+        available: rows.length > 0,
+      },
+      {
+        id: 'breakout',
+        name: 'Breakout Watch',
+        criteria: 'Ranks 15-100 with +7% or more in 24h',
+        note: 'Coins outside the mega-caps that may be rotating into focus.',
+        matches: breakoutMatches,
+        available: rows.length > 0,
+      },
+      {
+        id: 'whale',
+        name: 'Whale Flow',
+        criteria: 'Positive whale net flow from the latest whale snapshot',
+        note: whaleMatches.length
+          ? 'Tracks coins where whale inflows are showing up in the latest dataset.'
+          : 'Whale matches will appear once coin_whale_metrics is populated and readable by the app.',
+        matches: whaleMatches,
+        available: whaleRows.length > 0,
+      },
+    ];
+  }, [marketRows, whaleRows]);
+
+  useEffect(() => {
+    if (!scouters.find((scouter) => scouter.id === selectedScouterId)) {
+      setSelectedScouterId(scouters[0]?.id ?? 'momentum');
+    }
+  }, [scouters, selectedScouterId]);
+
+  const selectedScouter = scouters.find((scouter) => scouter.id === selectedScouterId) ?? scouters[0];
+  const recentMatches = useMemo(() => {
+    return scouters
+      .flatMap((scouter) =>
+        scouter.matches.slice(0, 2).map((match) => ({
+          ...match,
+          scouterName: scouter.name,
+          scouterId: scouter.id,
+        }))
+      )
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 8);
+  }, [scouters]);
+  const lastUpdated = useMemo(() => getLatestTimestamp(marketRows), [marketRows]);
+
+  const handleViewScouter = useCallback((scouterId: string) => {
+    setSelectedScouterId(scouterId);
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        if (Platform.OS === 'web') {
+          const node = matchesSectionRef.current as any;
+          if (node?.scrollIntoView) {
+            node.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            return;
+          }
+        }
+        scrollRef.current?.scrollToEnd({ animated: true });
+      }, 80);
+    });
+  }, []);
+
   return (
-    <SafeAreaView edges={["top","left","right"]} style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView edges={["top", "left", "right"]} style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.header}>
         <ThemedText type="title" style={{ color: colors.text }}>{t('ScoutersHeader')}</ThemedText>
         <ThemedText style={[styles.subtitle, { color: colors.textSecondary }]}>
@@ -40,16 +252,14 @@ export default function ScoutersScreen() {
         </ThemedText>
       </View>
 
-      <ScrollView 
-        contentContainerStyle={styles.content} 
+      <ScrollView
+        ref={scrollRef}
+        contentContainerStyle={styles.content}
         contentInsetAdjustmentBehavior="never"
         refreshControl={(
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={() => {
-              setRefreshing(true);
-              setTimeout(() => setRefreshing(false), 900);
-            }}
+            onRefresh={onRefresh}
             tintColor={colors.primary}
             title={t('RefreshTitle')}
             titleColor={colors.primary}
@@ -58,118 +268,198 @@ export default function ScoutersScreen() {
           />
         )}
       >
-        {/* Recent Matches */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <ThemedText type="subtitle" style={[styles.sectionTitle, { color: colors.text }]}>
-              {t('RecentMatches')}
-            </ThemedText>
-          </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.matchesScroll}>
-            {recentMatches.map((match, idx) => (
-              <TouchableOpacity key={idx} style={[styles.matchCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                <ThemedText style={{ color: colors.text, fontSize: 14, fontWeight: '700' }}>
-                  {match.symbol}
-                </ThemedText>
-                <ThemedText style={{ color: match.positive ? colors.success : colors.danger, fontSize: 12, fontWeight: '700', marginTop: 4 }}>
-                  {match.change}
-                </ThemedText>
-                <ThemedText style={{ color: colors.textTertiary, fontSize: 10, marginTop: 6 }}>
-                  {match.time}
-                </ThemedText>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+        <View style={[styles.infoCard, { backgroundColor: colors.surface, borderColor: colors.border }]}> 
+          <ThemedText style={{ color: colors.text, fontWeight: '700' }}>Live presets, not fake scanners</ThemedText>
+          <ThemedText style={{ color: colors.textSecondary, marginTop: 6, lineHeight: 20 }}>
+            Scouters now derive matches from live Supabase market snapshots. Custom saved scanners will come after dedicated backend tables land.
+          </ThemedText>
+          <ThemedText style={{ color: colors.textTertiary, marginTop: 10, fontSize: 12 }}>
+            Last market update: {lastUpdated ? new Date(lastUpdated).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+          </ThemedText>
         </View>
 
-        {/* Create New Button */}
-        <TouchableOpacity style={[styles.createButton, { backgroundColor: colors.primary, borderColor: colors.primary }]}>
-          <IconSymbol name="plus.circle.fill" size={20} color={colors.primaryText} />
-          <ThemedText style={[styles.createButtonText, { color: colors.primaryText }]}>
-            {t('CreateNewScouter')}
-          </ThemedText>
-        </TouchableOpacity>
+        {loading ? (
+          <View style={styles.centerState}>
+            <ActivityIndicator color={colors.primary} />
+            <ThemedText style={{ color: colors.textSecondary, marginTop: 12 }}>Loading live scouters…</ThemedText>
+          </View>
+        ) : null}
 
-        {/* Scouter Cards */}
-        <View style={styles.section}>
-          <ThemedText type="subtitle" style={[styles.sectionTitle, { color: colors.text }]}>
-            {t('YourScouters')}
-          </ThemedText>
-          {scouters.map((scouter) => (
-            <View key={scouter.id} style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <View style={styles.cardHeader}>
-                <View style={styles.cardLeft}>
-                  <IconSymbol name="scope" size={20} color={colors.primary} />
-                  <View style={{ flex: 1 }}>
-                    <ThemedText type="defaultSemiBold" style={{ color: colors.text }} numberOfLines={1} ellipsizeMode="tail">
-                      {scouter.name}
+        {!loading && error ? (
+          <View style={[styles.infoCard, { backgroundColor: colors.surface, borderColor: colors.border }]}> 
+            <ThemedText style={{ color: colors.danger, fontWeight: '700' }}>Could not load scouters</ThemedText>
+            <ThemedText style={{ color: colors.textSecondary, marginTop: 6 }}>{error}</ThemedText>
+          </View>
+        ) : null}
+
+        {!loading && !error && (
+          <>
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <ThemedText type="subtitle" style={[styles.sectionTitle, { color: colors.text }]}>
+                  {t('RecentMatches')}
+                </ThemedText>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.matchesScroll}>
+                {recentMatches.length ? recentMatches.map((match) => (
+                  <TouchableOpacity
+                    key={`${match.scouterId}-${match.symbol}`}
+                    style={[styles.matchCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                    onPress={() => router.push({ pathname: '/coin/[symbol]' as any, params: { symbol: match.symbol } })}
+                  >
+                    <ThemedText style={{ color: colors.text, fontSize: 14, fontWeight: '700' }}>
+                      {match.symbol}
                     </ThemedText>
-                    <ThemedText style={{ color: colors.textTertiary, fontSize: 11, marginTop: 2 }} numberOfLines={1} ellipsizeMode="tail">
-                      {t('LastRun')}: {scouter.lastRun}
+                    <ThemedText style={{ color: (match.changePct ?? 0) >= 0 ? colors.success : colors.danger, fontSize: 12, fontWeight: '700', marginTop: 4 }}>
+                      {formatCoinPercent(match.changePct)}
+                    </ThemedText>
+                    <ThemedText style={{ color: colors.textSecondary, fontSize: 11, marginTop: 6 }} numberOfLines={1}>
+                      {match.scouterName}
+                    </ThemedText>
+                    <ThemedText style={{ color: colors.textTertiary, fontSize: 10, marginTop: 4 }} numberOfLines={1}>
+                      {match.primaryMetric}
+                    </ThemedText>
+                  </TouchableOpacity>
+                )) : (
+                  <View style={[styles.emptyInlineCard, { backgroundColor: colors.surface, borderColor: colors.border }]}> 
+                    <ThemedText style={{ color: colors.textSecondary }}>No live matches yet. Pull to refresh after ingest runs.</ThemedText>
+                  </View>
+                )}
+              </ScrollView>
+            </View>
+
+            <TouchableOpacity style={[styles.createButton, { backgroundColor: colors.primary, borderColor: colors.primary }]} onPress={onRefresh}>
+              <IconSymbol name="arrow.clockwise" size={20} color={colors.primaryText} />
+              <ThemedText style={[styles.createButtonText, { color: colors.primaryText }]}>Refresh live scanners</ThemedText>
+            </TouchableOpacity>
+
+            <View style={styles.section}>
+              <ThemedText type="subtitle" style={[styles.sectionTitle, { color: colors.text }]}>
+                {t('YourScouters')}
+              </ThemedText>
+              {scouters.map((scouter) => {
+                const selected = selectedScouter?.id === scouter.id;
+                const active = scouter.available;
+                return (
+                  <View key={scouter.id} style={[styles.card, { backgroundColor: selected ? colors.surfaceElevated : colors.surface, borderColor: selected ? colors.primary : colors.border }]}> 
+                    <View style={styles.cardHeader}>
+                      <View style={styles.cardLeft}>
+                        <IconSymbol name="scope" size={20} color={colors.primary} />
+                        <View style={{ flex: 1 }}>
+                          <ThemedText type="defaultSemiBold" style={{ color: colors.text }} numberOfLines={1}>
+                            {scouter.name}
+                          </ThemedText>
+                          <ThemedText style={{ color: colors.textTertiary, fontSize: 11, marginTop: 2 }} numberOfLines={1}>
+                            {t('LastRun')}: {lastUpdated ? formatRelativeTime(lastUpdated) : '--'}
+                          </ThemedText>
+                        </View>
+                      </View>
+                      <View style={[styles.statusBadge, { backgroundColor: active ? colors.success : colors.border }]}> 
+                        <ThemedText style={[styles.statusText, { color: active ? colors.primaryText : colors.textTertiary }]}>
+                          {active ? t('Active') : t('Paused')}
+                        </ThemedText>
+                      </View>
+                    </View>
+                    <View style={[styles.criteriaBox, { backgroundColor: colors.surface, borderColor: colors.border }]}> 
+                      <ThemedText style={{ color: colors.textSecondary, fontSize: 11 }}>{scouter.criteria}</ThemedText>
+                      <ThemedText style={{ color: colors.textTertiary, fontSize: 11, marginTop: 6 }}>{scouter.note}</ThemedText>
+                    </View>
+                    <View style={styles.cardStats}>
+                      <View style={styles.stat}>
+                        <IconSymbol name="chart.line.uptrend.xyaxis" size={15} color={colors.primary} />
+                        <ThemedText style={{ color: colors.text, fontSize: 13, fontWeight: '600' }}>
+                          {scouter.matches.length} {t('MatchesToday')}
+                        </ThemedText>
+                      </View>
+                    </View>
+                    <View style={styles.cardActions}>
+                      <TouchableOpacity style={[styles.actionButton, { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 }]} onPress={onRefresh}>
+                        <IconSymbol name="play.fill" size={13} color={colors.primary} />
+                        <ThemedText style={{ color: colors.primary, fontSize: 12, fontWeight: '600' }}>{t('RunNow')}</ThemedText>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={[styles.actionButton, { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 }]} onPress={() => handleViewScouter(scouter.id)}>
+                        <IconSymbol name="eye.fill" size={13} color={colors.text} />
+                        <ThemedText style={{ color: colors.text, fontSize: 12, fontWeight: '600' }}>View matches</ThemedText>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+
+            {selectedScouter ? (
+              <View ref={matchesSectionRef as any} style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <ThemedText type="subtitle" style={[styles.sectionTitle, { color: colors.text }]}> 
+                    Live matches · {selectedScouter.name}
+                  </ThemedText>
+                </View>
+                {selectedScouter.matches.length ? selectedScouter.matches.map((match) => {
+                  const saved = isSaved(match.symbol);
+                  const changeColor = (match.changePct ?? 0) >= 0 ? colors.success : colors.danger;
+                  return (
+                    <TouchableOpacity
+                      key={`${selectedScouter.id}-${match.symbol}`}
+                      style={[styles.rowCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                      onPress={() => router.push({ pathname: '/coin/[symbol]' as any, params: { symbol: match.symbol } })}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <View style={styles.rowTop}>
+                          <ThemedText type="defaultSemiBold" style={{ color: colors.text }}>{match.symbol}</ThemedText>
+                          <ThemedText style={{ color: changeColor, fontWeight: '700' }}>{formatCoinPercent(match.changePct)}</ThemedText>
+                        </View>
+                        <ThemedText style={{ color: colors.textSecondary, fontSize: 12, marginTop: 4 }} numberOfLines={1}>{match.name}</ThemedText>
+                        <View style={{ marginTop: 10 }}>
+                          <CoinSparkline symbol={match.symbol} color={changeColor} width={128} height={34} />
+                        </View>
+                        <View style={styles.metricRow}>
+                          <ThemedText style={{ color: colors.textSecondary, fontSize: 12 }}>{match.primaryMetric}</ThemedText>
+                          <ThemedText style={{ color: colors.textSecondary, fontSize: 12 }}>{match.secondaryMetric}</ThemedText>
+                        </View>
+                      </View>
+                      <View style={styles.rowRight}>
+                        <ThemedText style={{ color: colors.text, fontWeight: '700' }}>{match.price}</ThemedText>
+                        <TouchableOpacity style={{ marginTop: 12 }} onPress={() => toggleSaved(match.symbol)}>
+                          <IconSymbol name={saved ? 'bookmark.fill' : 'bookmark'} size={18} color={saved ? colors.primary : colors.textTertiary} />
+                        </TouchableOpacity>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                }) : (
+                  <View style={[styles.infoCard, { backgroundColor: colors.surface, borderColor: colors.border }]}> 
+                    <ThemedText style={{ color: colors.textSecondary }}>
+                      No matches currently satisfy this preset. Pull to refresh after the next market ingest run.
                     </ThemedText>
                   </View>
-                </View>
-                <View style={[styles.statusBadge, { backgroundColor: scouter.active ? colors.success : colors.border }]}>
-                  <ThemedText style={[styles.statusText, { color: scouter.active ? colors.primaryText : colors.textTertiary }]}>
-                    {scouter.active ? t('Active') : t('Paused')}
-                  </ThemedText>
-                </View>
+                )}
               </View>
-              <View style={[styles.criteriaBox, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
-                <ThemedText style={{ color: colors.textSecondary, fontSize: 11 }}>
-                  {scouter.criteria}
-                </ThemedText>
-              </View>
-              <View style={styles.cardStats}>
-                <View style={styles.stat}>
-                  <IconSymbol name="chart.line.uptrend.xyaxis" size={15} color={colors.primary} />
-                  <ThemedText style={{ color: colors.text, fontSize: 13, fontWeight: '600' }}>
-                    {scouter.matches} {t('MatchesToday')}
-                  </ThemedText>
-                </View>
-              </View>
-              <View style={styles.cardActions}>
-                <TouchableOpacity style={[styles.actionButton, { backgroundColor: colors.surfaceElevated, borderColor: colors.border, borderWidth: 1 }]}>
-                  <IconSymbol name="play.fill" size={13} color={colors.primary} />
-                  <ThemedText style={{ color: colors.primary, fontSize: 12, fontWeight: '600' }}>
-                    {t('RunNow')}
-                  </ThemedText>
-                </TouchableOpacity>
-                <TouchableOpacity style={[styles.actionButton, { backgroundColor: colors.surfaceElevated, borderColor: colors.border, borderWidth: 1 }]}>
-                  <IconSymbol name="pencil" size={13} color={colors.text} />
-                  <ThemedText style={{ color: colors.text, fontSize: 12, fontWeight: '600' }}>
-                    {t('Edit')}
-                  </ThemedText>
-                </TouchableOpacity>
-              </View>
-            </View>
-          ))}
-        </View>
-
-        {/* Templates */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <ThemedText type="subtitle" style={[styles.sectionTitle, { color: colors.text }]}>
-              {t('PopularTemplates')}
-            </ThemedText>
-          </View>
-          {templates.map((template) => (
-            <TouchableOpacity key={template.id} style={[styles.templateCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <View style={{ flex: 1 }}>
-                <ThemedText style={{ color: colors.text, fontSize: 14, fontWeight: '600' }}>
-                  {template.name}
-                </ThemedText>
-                <ThemedText style={{ color: colors.textSecondary, fontSize: 12, marginTop: 4 }}>
-                  {template.description}
-                </ThemedText>
-              </View>
-              <IconSymbol name="chevron.right" size={16} color={colors.textTertiary} />
-            </TouchableOpacity>
-          ))}
-        </View>
+            ) : null}
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
+}
+
+function formatCompactDollars(value: number | null) {
+  if (value == null) return '--';
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    notation: 'compact',
+    maximumFractionDigits: 1,
+  }).format(value);
+}
+
+function formatRelativeTime(iso: string) {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const diffMinutes = Math.max(0, Math.round(diffMs / 60000));
+  if (diffMinutes < 1) return 'just now';
+  if (diffMinutes < 60) return `${diffMinutes}m ago`;
+  const diffHours = Math.round(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+  const diffDays = Math.round(diffHours / 24);
+  return `${diffDays}d ago`;
 }
 
 const styles = StyleSheet.create({
@@ -189,6 +479,16 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 16,
   },
+  infoCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 14,
+  },
+  centerState: {
+    paddingVertical: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   sectionHeader: {
     marginBottom: 4,
   },
@@ -202,8 +502,15 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1,
     marginRight: 10,
-    minWidth: 92,
-    alignItems: 'center',
+    minWidth: 120,
+  },
+  emptyInlineCard: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginRight: 10,
+    width: 240,
   },
   createButton: {
     flexDirection: 'row',
@@ -284,13 +591,27 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 8,
   },
-  templateCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 12,
-    borderRadius: 10,
+  rowCard: {
+    borderRadius: 14,
     borderWidth: 1,
-    marginBottom: 8,
+    padding: 14,
+    flexDirection: 'row',
+    gap: 12,
+  },
+  rowTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  metricRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginTop: 10,
+  },
+  rowRight: {
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    minWidth: 88,
   },
 });

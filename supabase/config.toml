@@ -1,0 +1,2 @@
+[functions.admin-status]
+verify_jwt = true

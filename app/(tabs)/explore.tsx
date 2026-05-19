@@ -1,7 +1,7 @@
 import { ThemedText } from '@/components/themed-text';
-import { CoinSparkline } from '@/components/ui/coin-sparkline';
 import { BitcoinIcon } from '@/components/ui/bitcoin-icon';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { MarketRowCard } from '@/components/ui/market-row-card';
 import { useSettings } from '@/contexts/settings-context';
 import { useTheme } from '@/contexts/theme-context';
 import { useWatchlist } from '@/contexts/watchlist-context';
@@ -10,6 +10,17 @@ import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+type ExploreListRow = {
+  coinId?: string;
+  s: string;
+  name: string;
+  p: string;
+  c: string;
+  rank: number | null;
+  metricLabel?: string;
+  metricValue?: string;
+};
 
 export default function ExploreScreen() {
   const { colors } = useTheme();
@@ -23,7 +34,7 @@ export default function ExploreScreen() {
     try {
       const { data, error } = await supabase
         .from('coin_latest_view')
-        .select('symbol, name, price_usd, change_24h_pct, volume_24h_usd, rank')
+        .select('coin_id, symbol, name, price_usd, change_24h_pct, volume_24h_usd, rank')
         .order('rank', { ascending: true })
         .limit(120);
 
@@ -47,6 +58,15 @@ export default function ExploreScreen() {
     p == null ? '-' : p.toLocaleString(undefined, { maximumFractionDigits: p >= 1 ? 2 : 6 });
   const formatChange = (v: number | null) =>
     v == null ? '0.0%' : `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`;
+  const formatCompactDollars = (value: number | null) => {
+    if (value == null) return '--';
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      notation: 'compact',
+      maximumFractionDigits: 1,
+    }).format(value);
+  };
 
   const tickerItems = useMemo(() => {
     if (!coinsData.length) {
@@ -76,20 +96,20 @@ export default function ExploreScreen() {
 
   // ticker animation handled in <Ticker />
 
-  const stockLists = useMemo(() => {
+  const stockLists = useMemo<Record<'volume' | 'trades' | 'gainers' | 'losers' | 'popular', ExploreListRow[]>>(() => {
     if (!coinsData.length) {
       return {
         volume: [
-          { s: 'BTC', p: '$64,320', c: '+2.1%' },
-          { s: 'ETH', p: '$2,430', c: '+1.4%' },
-          { s: 'USDT', p: '$1.00', c: '+0.0%' },
-          { s: 'SOL', p: '$102.50', c: '+5.2%' },
-          { s: 'BNB', p: '$315.40', c: '+3.1%' },
-          { s: 'XRP', p: '$0.62', c: '+1.5%' },
-          { s: 'DOGE', p: '$0.14', c: '+3.8%' },
-          { s: 'TON', p: '$7.24', c: '+2.9%' },
-          { s: 'LINK', p: '$18.42', c: '+1.3%' },
-          { s: 'PEPE', p: '$0.000012', c: '+16.4%' },
+          { s: 'BTC', name: 'Bitcoin', p: '$64,320', c: '+2.1%', rank: 1, metricLabel: '24H vol', metricValue: '$48B' },
+          { s: 'ETH', name: 'Ethereum', p: '$2,430', c: '+1.4%', rank: 2, metricLabel: '24H vol', metricValue: '$22B' },
+          { s: 'USDT', name: 'Tether', p: '$1.00', c: '+0.0%', rank: 3, metricLabel: '24H vol', metricValue: '$71B' },
+          { s: 'SOL', name: 'Solana', p: '$102.50', c: '+5.2%', rank: 4, metricLabel: '24H vol', metricValue: '$5.8B' },
+          { s: 'BNB', name: 'BNB', p: '$315.40', c: '+3.1%', rank: 5, metricLabel: '24H vol', metricValue: '$2.9B' },
+          { s: 'XRP', name: 'XRP', p: '$0.62', c: '+1.5%', rank: 6, metricLabel: '24H vol', metricValue: '$1.4B' },
+          { s: 'DOGE', name: 'Dogecoin', p: '$0.14', c: '+3.8%', rank: 7, metricLabel: '24H vol', metricValue: '$1.1B' },
+          { s: 'TON', name: 'Toncoin', p: '$7.24', c: '+2.9%', rank: 8, metricLabel: '24H vol', metricValue: '$812M' },
+          { s: 'LINK', name: 'Chainlink', p: '$18.42', c: '+1.3%', rank: 9, metricLabel: '24H vol', metricValue: '$642M' },
+          { s: 'PEPE', name: 'Pepe', p: '$0.000012', c: '+16.4%', rank: 10, metricLabel: '24H vol', metricValue: '$1.7B' },
         ],
         trades: [],
         gainers: [],
@@ -100,42 +120,51 @@ export default function ExploreScreen() {
 
     const rows = coinsData.map((r) => ({
       ...r,
+      coinId: r.coin_id ?? undefined,
       priceNum: r.price_usd != null ? Number(r.price_usd) : null,
       changeNum: r.change_24h_pct != null ? Number(r.change_24h_pct) : null,
       vol24: r.volume_24h_usd != null ? Number(r.volume_24h_usd) : 0,
       rankNum: r.rank != null ? Number(r.rank) : Infinity,
     }));
 
-    const mapRow = (r: any) => ({
+    const mapRow = (r: any, metricLabel?: string, metricValue?: string) => ({
+      coinId: r.coinId,
       s: r.symbol?.toUpperCase?.() ?? '',
+      name: r.name ?? r.symbol ?? '',
       p: formatPrice(r.priceNum),
       c: formatChange(r.changeNum),
+      rank: Number.isFinite(r.rankNum) ? r.rankNum : null,
+      metricLabel,
+      metricValue,
     });
 
     const volume = [...rows]
       .sort((a, b) => (b.vol24 ?? 0) - (a.vol24 ?? 0))
       .slice(0, 10)
-      .map(mapRow);
+      .map((row) => mapRow(row, '24H vol', formatCompactDollars(row.vol24)));
 
     const gainers = [...rows]
       .filter((r) => (r.changeNum ?? 0) > 0)
       .sort((a, b) => (b.changeNum ?? 0) - (a.changeNum ?? 0))
       .slice(0, 10)
-      .map(mapRow);
+      .map((row) => mapRow(row, '24H vol', formatCompactDollars(row.vol24)));
 
     const losers = [...rows]
       .filter((r) => (r.changeNum ?? 0) < 0)
       .sort((a, b) => (a.changeNum ?? 0) - (b.changeNum ?? 0))
       .slice(0, 10)
-      .map(mapRow);
+      .map((row) => mapRow(row, '24H vol', formatCompactDollars(row.vol24)));
 
     const popular = [...rows]
       .sort((a, b) => a.rankNum - b.rankNum)
       .slice(0, 10)
-      .map(mapRow);
+      .map((row) => mapRow(row, 'Market rank', `#${row.rankNum}`));
 
     // For now, use volume as a proxy for trades list.
-    const trades = volume;
+    const trades = [...rows]
+      .sort((a, b) => (b.vol24 ?? 0) - (a.vol24 ?? 0))
+      .slice(0, 10)
+      .map((row) => mapRow(row, 'Vol proxy', formatCompactDollars(row.vol24)));
 
     return { volume, trades, gainers, losers, popular };
   }, [coinsData]);
@@ -195,38 +224,46 @@ export default function ExploreScreen() {
               </TouchableOpacity>
             ))}
           </View>
-          <View style={{ borderTopWidth: 1, borderTopColor: colors.border }} />
-          {stockLists[stocksTab].map((row, i) => {
+          <View style={[styles.liveBoardCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={styles.liveBoardHeader}>
+              <View>
+                <ThemedText style={{ color: colors.text, fontWeight: '700' }}>
+                  Live market board
+                </ThemedText>
+                <ThemedText style={{ color: colors.textSecondary, fontSize: 12, marginTop: 4 }}>
+                  Open any coin for the interactive chart and whale snapshot.
+                </ThemedText>
+              </View>
+              <View style={[styles.liveBadge, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
+                <ThemedText style={{ color: colors.success, fontSize: 11, fontWeight: '700' }}>
+                  LIVE
+                </ThemedText>
+              </View>
+            </View>
+
+            {stockLists[stocksTab].map((row, i) => {
             const saved = isSaved(row.s);
             return (
-            <TouchableOpacity
-              key={row.s}
-              style={[styles.plainRow, { borderBottomColor: colors.border, borderBottomWidth: i===stockLists[stocksTab].length-1 ? 0 : 1 }]}
-              onPress={() => router.push({ pathname: '/coin/[symbol]' as any, params: { symbol: row.s } })}
-            > 
-              <ThemedText style={{ color: colors.text, width: 22, textAlign: 'right', marginRight: 6 }}>{i+1}</ThemedText>
-              <ThemedText style={{ color: colors.text, width: 72 }}>{row.s}</ThemedText>
-              <View style={{ flex: 1, paddingRight: 8 }}>
-                <CoinSparkline
-                  symbol={row.s}
-                  color={row.c.startsWith('-') ? colors.danger : colors.success}
-                  width={74}
-                />
-              </View>
-              <ThemedText style={{ color: colors.textSecondary, width: 80, textAlign: 'right', marginRight: 10 }}>{row.p}</ThemedText>
-              <ThemedText style={{ color: row.c.startsWith('-') ? colors.danger : colors.success, fontWeight: '700', width: 70, textAlign: 'right' }}>{row.c}</ThemedText>
-              <TouchableOpacity
-                accessibilityLabel={saved ? `Remove ${row.s} from saved` : `Save ${row.s}`}
-                style={{ padding: 6, marginLeft: 8 }}
-                onPress={() => toggleSaved(row.s)}
-              >
-                <IconSymbol name={saved ? 'bookmark.fill' : 'bookmark'} size={18} color={saved ? colors.primary : colors.textTertiary} />
-              </TouchableOpacity>
-            </TouchableOpacity>
-          )})}
+              <MarketRowCard
+                key={row.s}
+                badgeText={String(i + 1).padStart(2, '0')}
+                coinId={row.coinId}
+                symbol={row.s}
+                name={row.name}
+                priceLabel={row.p.startsWith('$') ? row.p : `$${row.p}`}
+                changeLabel={row.c}
+                metricLabel={row.metricLabel}
+                metricValue={row.metricValue}
+                saved={saved}
+                onPress={() => router.push({ pathname: '/coin/[symbol]' as any, params: { symbol: row.s } })}
+                onToggleSaved={() => toggleSaved(row.s)}
+              />
+            )})}
+          </View>
+
           <TouchableOpacity 
             onPress={() => router.push({ pathname: '/explore/top100' as any, params: { tab: stocksTab } })}
-            style={[styles.moreBtn, { borderColor: colors.border }]}
+            style={[styles.moreBtn, { borderColor: colors.border, backgroundColor: colors.surface }]}
           > 
             <IconSymbol name="chevron.down" size={16} color={colors.textSecondary} />
             <ThemedText style={{ color: colors.textSecondary, fontWeight: '700' }}>{t('More')}</ThemedText>
@@ -343,8 +380,10 @@ const styles = StyleSheet.create({
   inlineTabsRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 14, paddingTop: 6, paddingBottom: 6 },
   inlineTabItem: { alignItems: 'center' },
   inlineTabUnderline: { height: 2, borderRadius: 1, alignSelf: 'stretch', marginTop: 4 },
-  plainRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12 },
-  moreBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, borderTopWidth: 1, paddingHorizontal: 12, paddingVertical: 12, alignSelf: 'center' },
+  liveBoardCard: { borderWidth: 1, borderRadius: 18, padding: 12 },
+  liveBoardHeader: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, marginBottom: 12 },
+  liveBadge: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6, alignSelf: 'flex-start' },
+  moreBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 12, alignSelf: 'center' },
   infoCard: { borderRadius: 12, borderWidth: 1, padding: 14 },
   tickerRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
 });

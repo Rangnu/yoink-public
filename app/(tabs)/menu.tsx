@@ -48,6 +48,7 @@ export default function MenuScreen() {
   const accountSubtitle = user?.email || 'Sign in to sync settings and saved items later';
   const pushLogin = (redirectTo: string) =>
     router.push({ pathname: '/auth/login', params: { redirectTo } } as any);
+  const showAdminPanel = Boolean(user);
   const feedStatusLabel = useMemo(() => {
     if (feedStatus === 'live') return 'Live';
     if (feedStatus === 'error') return 'Offline';
@@ -173,6 +174,17 @@ export default function MenuScreen() {
           <MenuRow icon="scope" label={t('Scouters')} onPress={() => router.push('/scouters')} colors={colors} divider colorsObj={colors} />
           <MenuRow icon="list.number" label="Top 100 rankings" onPress={() => router.push('/explore/top100')} colors={colors} />
         </Section>
+
+        {showAdminPanel ? (
+          <Section title="Admin" icon="lock.shield.fill" colors={colors}>
+            <MenuRow
+              icon="waveform.path.ecg.rectangle"
+              label="Admin panel"
+              onPress={() => router.push('/admin' as any)}
+              colors={colors}
+            />
+          </Section>
+        ) : null}
 
         <Section title={t('Activity')} icon="person.crop.circle" colors={colors}>
           <MenuRow

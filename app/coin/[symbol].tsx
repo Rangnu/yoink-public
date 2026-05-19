@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { CoinSparkline } from '@/components/ui/coin-sparkline';
+import type { CoinChartRange } from '@/components/ui/coin-sparkline';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useActivity } from '@/contexts/activity-context';
 import { useTheme } from '@/contexts/theme-context';
@@ -58,6 +59,9 @@ export default function CoinDetailScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [viewRecorded, setViewRecorded] = useState(false);
+  const [chartRange, setChartRange] = useState<CoinChartRange>('24H');
+  const [chartVariant, setChartVariant] = useState<'line' | 'bar'>('line');
+  const [chartWidth, setChartWidth] = useState(320);
 
   const loadCoin = useCallback(async () => {
     if (!symbol) {
@@ -156,8 +160,24 @@ export default function CoinDetailScreen() {
   const formatPercent = (value: number | null) =>
     value == null ? '--' : `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`;
 
+  const formatCompactDollars = (value: number | null) => {
+    if (value == null) return '--';
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      notation: 'compact',
+      maximumFractionDigits: 1,
+    }).format(value);
+  };
+
   const saved = isSaved(symbol);
   const primaryChangeColor = (coin?.change_24h_pct ?? 0) >= 0 ? colors.success : colors.danger;
+  const chartRangeChange = chartRange === '1H'
+    ? coin?.change_1h_pct ?? null
+    : chartRange === '7D'
+      ? coin?.change_7d_pct ?? null
+      : coin?.change_24h_pct ?? null;
+  const chartRangeChangeColor = (chartRangeChange ?? 0) >= 0 ? colors.success : colors.danger;
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={[styles.container, { backgroundColor: colors.background }]}>
@@ -236,8 +256,135 @@ export default function CoinDetailScreen() {
                 {formatPercent(coin.change_24h_pct)} in 24h
               </ThemedText>
 
-              <View style={[styles.sparklineCard, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
-                <CoinSparkline symbol={coin.symbol} color={primaryChangeColor} width={320} height={120} />
+              <View
+                style={[styles.sparklineCard, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
+                onLayout={(event) => {
+                  const nextWidth = Math.max(240, Math.floor(event.nativeEvent.layout.width) - 24);
+                  setChartWidth((current) => (Math.abs(current - nextWidth) > 4 ? nextWidth : current));
+                }}
+              >
+                <View style={styles.chartHeaderRow}>
+                  <View style={{ flex: 1 }}>
+                    <ThemedText style={{ color: colors.text, fontWeight: '700', fontSize: 16 }}>
+                      {chartRange} price action
+                    </ThemedText>
+                    <ThemedText style={{ color: colors.textSecondary, marginTop: 4, fontSize: 12 }}>
+                      {chartVariant === 'line'
+                        ? 'Hover or drag to inspect each snapshot and the 24h volume trend.'
+                        : 'Switch between line and price bars while keeping the volume bars below.'}
+                    </ThemedText>
+                  </View>
+
+                  <View
+                    style={[
+                      styles.chartChangePill,
+                      {
+                        backgroundColor: colors.surface,
+                        borderColor: colors.border,
+                      },
+                    ]}
+                  >
+                    <ThemedText style={{ color: chartRangeChangeColor, fontWeight: '700', fontSize: 12 }}>
+                      {formatPercent(chartRangeChange)}
+                    </ThemedText>
+                  </View>
+                </View>
+
+                <View style={styles.chartControlsRow}>
+                  <View style={styles.chartRangeRow}>
+                    {(['1H', '24H', '7D'] as const).map((range) => {
+                      const active = chartRange === range;
+                      return (
+                        <TouchableOpacity
+                          key={range}
+                          onPress={() => setChartRange(range)}
+                          style={[
+                            styles.chartRangeButton,
+                            {
+                              backgroundColor: active ? colors.primary : colors.surface,
+                              borderColor: active ? colors.primary : colors.border,
+                            },
+                          ]}
+                        >
+                          <ThemedText
+                            style={{
+                              color: active ? colors.primaryText : colors.text,
+                              fontSize: 12,
+                              fontWeight: '700',
+                            }}
+                          >
+                            {range}
+                          </ThemedText>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+
+                  <View style={styles.chartToggleRow}>
+                    {(['line', 'bar'] as const).map((variant) => {
+                      const active = chartVariant === variant;
+                      return (
+                        <TouchableOpacity
+                          key={variant}
+                          onPress={() => setChartVariant(variant)}
+                          style={[
+                            styles.chartToggleButton,
+                            {
+                              backgroundColor: active ? colors.primary : colors.surface,
+                              borderColor: active ? colors.primary : colors.border,
+                            },
+                          ]}
+                        >
+                          <ThemedText
+                            style={{
+                              color: active ? colors.primaryText : colors.text,
+                              fontSize: 12,
+                              fontWeight: '700',
+                            }}
+                          >
+                            {variant === 'line' ? 'Line' : 'Bars'}
+                          </ThemedText>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+
+                <View style={styles.chartCanvas}>
+                  <CoinSparkline
+                    coinId={coin.coin_id}
+                    symbol={coin.symbol}
+                    color={chartRangeChangeColor}
+                    width={chartWidth}
+                    height={220}
+                    range={chartRange}
+                    variant={chartVariant}
+                    interactive
+                    showArea={chartVariant === 'line'}
+                    showGrid
+                    showVolumeBars
+                    tooltipBackgroundColor={colors.surface}
+                    tooltipTextColor={colors.text}
+                  />
+                </View>
+
+                <View style={styles.chartMetaRow}>
+                  {[
+                    `${chartRange} view`,
+                    `24h vol ${formatCompactDollars(coin.volume_24h_usd)}`,
+                    chartVariant === 'line' ? 'Line price' : 'Bar price',
+                    'Hover details',
+                  ].map((item) => (
+                    <View
+                      key={item}
+                      style={[styles.chartMetaPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                    >
+                      <ThemedText style={{ color: colors.textSecondary, fontSize: 12, fontWeight: '600' }}>
+                        {item}
+                      </ThemedText>
+                    </View>
+                  ))}
+                </View>
               </View>
 
               <View style={styles.actionsRow}>
@@ -369,6 +516,9 @@ const styles = StyleSheet.create({
   content: {
     padding: 16,
     gap: 16,
+    width: '100%',
+    maxWidth: 980,
+    alignSelf: 'center',
   },
   centerState: {
     paddingVertical: 40,
@@ -402,8 +552,63 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     padding: 12,
+    gap: 12,
+  },
+  chartHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  chartChangePill: {
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  chartControlsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  chartRangeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  chartRangeButton: {
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  chartToggleRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  chartToggleButton: {
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  chartCanvas: {
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  chartMetaRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  chartMetaPill: {
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
   actionsRow: {
     marginTop: 16,

@@ -1,6 +1,6 @@
 import { ThemedText } from '@/components/themed-text';
-import { CoinSparkline } from '@/components/ui/coin-sparkline';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { MarketRowCard } from '@/components/ui/market-row-card';
 import { useSettings } from '@/contexts/settings-context';
 import { useTheme } from '@/contexts/theme-context';
 import { supabase } from '@/utils/supabase';
@@ -8,25 +8,6 @@ import { router } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
-// Mock Mini Chart Component (SVG placeholder)
-function MiniChart({ isPositive, color }: { isPositive: boolean; color: string }) {
-  return (
-    <View style={{ width: 50, height: 24 }}>
-      {/* Simple polyline representation using View - will be replaced with actual SVG */}
-      <View style={{ 
-        width: '100%', 
-        height: '100%', 
-        borderBottomWidth: 2, 
-        borderBottomColor: color,
-        borderRightWidth: 2,
-        borderRightColor: color,
-        opacity: 0.6,
-        transform: isPositive ? [{ scaleY: -1 }] : []
-      }} />
-    </View>
-  );
-}
 
 export default function HomeScreen() {
   const { colors } = useTheme();
@@ -43,12 +24,25 @@ export default function HomeScreen() {
   // Animated scroll value to coordinate header behaviors
   const scrollY = useRef(new Animated.Value(0)).current;
 
-  type HighlightRow = { symbol: string; name: string; price: string; change: string; changeValue: string };
+  type HighlightRow = {
+    coinId?: string;
+    symbol: string;
+    name: string;
+    price: string;
+    change: string;
+    changeValue: string;
+    rank?: number | null;
+  };
 
-  const mockData = useMemo(() => (
+  const mockData = useMemo<{
+    balanced: HighlightRow[];
+    fomo: HighlightRow[];
+    yoink: HighlightRow[];
+  }>(() => (
     {
       // Majors: large-cap cryptocurrencies
       balanced: Array.from({ length: 13 }, (_, i) => ({
+        coinId: undefined,
         symbol: ['BTC', 'ETH', 'SOL', 'BNB', 'XRP', 'ADA', 'AVAX', 'DOGE', 'TON', 'LINK', 'TRX', 'UNI', 'LTC'][i],
         name: [
           'Bitcoin',
@@ -68,12 +62,14 @@ export default function HomeScreen() {
         price: (50 + Math.random() * 60000).toFixed(2),
         change: ((Math.random() - 0.3) * 5).toFixed(2),
         changeValue: ((Math.random() - 0.3) * 10).toFixed(2),
+        rank: i + 1,
       })),
       // FOMO: higher-volatility meme / narrative coins
       fomo: Array.from({ length: 13 }, (_, i) => {
         const isLocked = i >= 3;
         const dramaticChange = isLocked ? ((Math.random() - 0.3) * 35) : ((Math.random() - 0.2) * 15);
         return {
+          coinId: undefined,
           symbol: ['PEPE', 'WIF', 'BONK', 'FLOKI', 'SHIB', 'MEME', 'BOME', 'BRETT', 'PONKE', 'MOG', 'DEGEN', 'TURBO', 'DOGE2'][i],
           name: [
             'Pepe',
@@ -93,11 +89,13 @@ export default function HomeScreen() {
           price: (0.000001 + Math.random() * 0.5).toFixed(6),
           change: dramaticChange.toFixed(2),
           changeValue: (dramaticChange * 0.3).toFixed(2),
+          rank: i + 1,
         };
 
       }),
       // Yoink: degen L1/L2 and DeFi plays
       yoink: Array.from({ length: 13 }, (_, i) => ({
+        coinId: undefined,
         symbol: ['APT', 'SUI', 'ARB', 'OP', 'PYTH', 'TIA', 'SEI', 'ENA', 'PENDLE', 'JUP', 'INJ', 'RON', 'W'][i],
         name: [
           'Aptos',
@@ -117,6 +115,7 @@ export default function HomeScreen() {
         price: (0.1 + Math.random() * 50).toFixed(2),
         change: ((Math.random() - 0.1) * 20).toFixed(2),
         changeValue: ((Math.random() - 0.1) * 8).toFixed(2),
+        rank: i + 1,
       })),
     }
   ), []);
@@ -167,11 +166,13 @@ export default function HomeScreen() {
       const pct = use1h ? r.change1h : r.change24;
       const abs = r.price != null && pct != null ? (r.price * pct) / 100 : 0;
       return {
+        coinId: r.coin_id ?? undefined,
         symbol: r.symbol?.toUpperCase?.() ?? '',
         name: r.name ?? r.symbol ?? '',
         price: formatPrice(r.price),
         change: formatChange(pct),
         changeValue: formatChange(abs),
+        rank: Number.isFinite(r.rankNum) ? r.rankNum : null,
       };
     };
 
@@ -199,7 +200,7 @@ export default function HomeScreen() {
     try {
       const { data, error } = await supabase
         .from('coin_latest_view')
-        .select('symbol, name, price_usd, change_24h_pct, change_1h_pct, volume_24h_usd, rank')
+        .select('coin_id, symbol, name, price_usd, change_24h_pct, change_1h_pct, volume_24h_usd, rank')
         .order('rank', { ascending: true })
         .limit(120);
 
@@ -226,6 +227,19 @@ export default function HomeScreen() {
   const onRefresh = () => {
     setRefreshing(true);
     loadHighlights().finally(() => setRefreshing(false));
+  };
+
+  const formatDollarMove = (value: string) => {
+    const parsed = Number.parseFloat(value);
+    if (!Number.isFinite(parsed)) return '--';
+    const abs = Math.abs(parsed).toLocaleString(undefined, { maximumFractionDigits: absFractionDigits(Math.abs(parsed)) });
+    return `${parsed >= 0 ? '+' : '-'}$${abs}`;
+  };
+
+  const absFractionDigits = (value: number) => {
+    if (value >= 1000) return 0;
+    if (value >= 1) return 2;
+    return 4;
   };
 
   // Animated glow and chevrons for Unlock CTA
@@ -387,43 +401,26 @@ export default function HomeScreen() {
         {current.slice(0, 5).map((stock, idx) => {
           const visible = showAll || idx < 3;
           const isPositive = parseFloat(stock.change) >= 0;
-          const changeColor = isPositive ? colors.success : colors.danger;
           return (
-            <TouchableOpacity 
+            <View
               key={`${tab}-${stock.symbol}-first`}
-              style={[styles.watchlistRow, { backgroundColor: colors.background, borderBottomColor: colors.border }]}
-              disabled={!visible}
-              onPress={visible ? () => router.push({ pathname: '/coin/[symbol]' as any, params: { symbol: stock.symbol } }) : undefined}
             >
-              <View style={styles.symbolSection}>
-                <ThemedText style={{ color: colors.text, fontWeight: '600', fontSize: 16, opacity: visible ? 1 : 0.6 }}>
-                  {stock.symbol}
-                </ThemedText>
-                <ThemedText style={{ color: colors.textSecondary, fontSize: 12, marginTop: 2, opacity: visible ? 1 : 0.5 }} numberOfLines={1}>
-                  {stock.name}
-                </ThemedText>
-              </View>
-              <View style={[styles.chartSection, !visible && { opacity: 0.3 }]}>
-                <CoinSparkline symbol={stock.symbol} color={changeColor} />
-              </View>
-              <View style={styles.priceSection}>
-                <View style={[styles.priceBox, { backgroundColor: changeColor, opacity: visible ? 1 : 0.3 }]}> 
-                  <ThemedText style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 14 }}>
-                    ${stock.price}
-                  </ThemedText>
-                </View>
-                {visible && (
-                  <View style={styles.changeInfo}>
-                    <ThemedText style={{ color: changeColor, fontWeight: '600', fontSize: 11 }}>
-                      {isPositive ? '+' : ''}{stock.changeValue}
-                    </ThemedText>
-                    <ThemedText style={{ color: changeColor, fontWeight: '600', fontSize: 11, marginLeft: 4 }}>
-                      {isPositive ? '+' : ''}{stock.change}%
-                    </ThemedText>
-                  </View>
-                )}
-              </View>
-            </TouchableOpacity>
+              <MarketRowCard
+                badgeText={String(idx + 1).padStart(2, '0')}
+                coinId={stock.coinId}
+                symbol={stock.symbol}
+                name={stock.name}
+                priceLabel={`$${stock.price}`}
+                changeLabel={`${isPositive ? '+' : ''}${stock.change}%`}
+                secondaryChangeLabel={formatDollarMove(stock.changeValue)}
+                metricLabel={stock.rank != null ? 'Mkt rank' : undefined}
+                metricValue={stock.rank != null ? `#${stock.rank}` : undefined}
+                chartRange={tab === 'yoink' ? '1H' : '24H'}
+                dimmed={!visible}
+                disabled={!visible}
+                onPress={visible ? () => router.push({ pathname: '/coin/[symbol]' as any, params: { symbol: stock.symbol } }) : undefined}
+              />
+            </View>
           );
         })}
 
@@ -436,43 +433,26 @@ export default function HomeScreen() {
             const originalIndex = 5 + idx;
             const visible = showAll || originalIndex < 3;
             const isPositive = parseFloat(stock.change) >= 0;
-            const changeColor = isPositive ? colors.success : colors.danger;
             return (
-              <TouchableOpacity
+              <View
                 key={`${tab}-${stock.symbol}-rest`}
-                style={[styles.watchlistRow, { backgroundColor: colors.background, borderBottomColor: colors.border }]}
-                disabled={!visible}
-                onPress={visible ? () => router.push({ pathname: '/coin/[symbol]' as any, params: { symbol: stock.symbol } }) : undefined}
               >
-                <View style={styles.symbolSection}>
-                  <ThemedText style={{ color: colors.text, fontWeight: '600', fontSize: 16, opacity: visible ? 1 : 0.6 }}>
-                    {stock.symbol}
-                  </ThemedText>
-                  <ThemedText style={{ color: colors.textSecondary, fontSize: 12, marginTop: 2, opacity: visible ? 1 : 0.5 }} numberOfLines={1}>
-                    {stock.name}
-                  </ThemedText>
-                </View>
-                <View style={[styles.chartSection, !visible && { opacity: 0.3 }]}>
-                  <MiniChart isPositive={isPositive} color={changeColor} />
-                </View>
-                <View style={styles.priceSection}>
-                  <View style={[styles.priceBox, { backgroundColor: changeColor, opacity: visible ? 1 : 0.3 }]}> 
-                    <ThemedText style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 14 }}>
-                      ${stock.price}
-                    </ThemedText>
-                  </View>
-                  {visible && (
-                    <View style={styles.changeInfo}>
-                      <ThemedText style={{ color: changeColor, fontWeight: '600', fontSize: 11 }}>
-                        {isPositive ? '+' : ''}{stock.changeValue}
-                      </ThemedText>
-                      <ThemedText style={{ color: changeColor, fontWeight: '600', fontSize: 11, marginLeft: 4 }}>
-                        {isPositive ? '+' : ''}{stock.change}%
-                      </ThemedText>
-                    </View>
-                  )}
-                </View>
-              </TouchableOpacity>
+                <MarketRowCard
+                  badgeText={String(originalIndex + 1).padStart(2, '0')}
+                  coinId={stock.coinId}
+                  symbol={stock.symbol}
+                  name={stock.name}
+                  priceLabel={`$${stock.price}`}
+                  changeLabel={`${isPositive ? '+' : ''}${stock.change}%`}
+                  secondaryChangeLabel={formatDollarMove(stock.changeValue)}
+                  metricLabel={stock.rank != null ? 'Mkt rank' : undefined}
+                  metricValue={stock.rank != null ? `#${stock.rank}` : undefined}
+                  chartRange={tab === 'yoink' ? '1H' : '24H'}
+                  dimmed={!visible}
+                  disabled={!visible}
+                  onPress={visible ? () => router.push({ pathname: '/coin/[symbol]' as any, params: { symbol: stock.symbol } }) : undefined}
+                />
+              </View>
             );
           })}
 

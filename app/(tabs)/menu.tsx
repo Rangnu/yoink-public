@@ -9,8 +9,8 @@ import { useAuth } from '@/contexts/auth-context';
 import { useSettings } from '@/contexts/settings-context';
 import { useTheme } from '@/contexts/theme-context';
 import { useWatchlist } from '@/contexts/watchlist-context';
+import { useAdminAccess } from '@/hooks/use-admin-access';
 import { fetchCoinMarketRows, getLatestTimestamp } from '@/utils/coin-market';
-import { canAccessAdmin } from '@/utils/admin';
 
 export default function MenuScreen() {
   const { colors } = useTheme();
@@ -18,6 +18,7 @@ export default function MenuScreen() {
   const { t } = useSettings();
   const { user, signOut } = useAuth();
   const { symbols, mode, syncState } = useWatchlist();
+  const { allowed: showAdminPanel } = useAdminAccess();
 
   const [refreshing, setRefreshing] = useState(false);
   const [marketCount, setMarketCount] = useState(0);
@@ -49,7 +50,6 @@ export default function MenuScreen() {
   const accountSubtitle = user?.email || t('SignInSyncLater');
   const pushLogin = (redirectTo: string) =>
     router.push({ pathname: '/auth/login', params: { redirectTo } } as any);
-  const showAdminPanel = canAccessAdmin(user);
   const feedStatusLabel = useMemo(() => {
     if (feedStatus === 'live') return t('LiveStatus');
     if (feedStatus === 'error') return t('OfflineStatus');

@@ -1,13 +1,12 @@
 import { Redirect, Stack } from 'expo-router';
 import { ActivityIndicator, View } from 'react-native';
 
-import { useAuth } from '@/contexts/auth-context';
+import { useAdminAccess } from '@/hooks/use-admin-access';
 import { useTheme } from '@/contexts/theme-context';
-import { canAccessAdmin } from '@/utils/admin';
 
 export default function AdminLayout() {
   const { colors } = useTheme();
-  const { user, loading } = useAuth();
+  const { allowed, loading } = useAdminAccess();
 
   if (loading) {
     return (
@@ -17,7 +16,7 @@ export default function AdminLayout() {
     );
   }
 
-  if (!canAccessAdmin(user)) {
+  if (!allowed) {
     return <Redirect href="/menu" />;
   }
 

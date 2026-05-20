@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { Modal, Pressable, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { Modal, Platform, Pressable, StyleSheet, TextInput, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -150,6 +150,7 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
   const { user, loading: authLoading } = useAuth();
   const { recordEvent } = useActivity();
   const { colors } = useTheme();
+  const { width: viewportWidth } = useWindowDimensions();
   const [symbols, setSymbols] = useState<string[]>([]);
   const [watchlists, setWatchlists] = useState<WatchlistSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -845,13 +846,28 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
     watchlists,
   ]);
 
+  const sheetResponsiveStyle = useMemo(() => {
+    if (Platform.OS !== 'web') return null;
+
+    return {
+      left: undefined,
+      right: undefined,
+      bottom: 16,
+      width: Math.max(320, Math.min(430, viewportWidth - 24)),
+      borderRadius: 20,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.border,
+      alignSelf: 'center' as const,
+    };
+  }, [colors.border, viewportWidth]);
+
   return (
     <>
       <WatchlistContext.Provider value={value}>{children}</WatchlistContext.Provider>
 
       <Modal animationType="slide" transparent visible={Boolean(pickerSymbol)} onRequestClose={closeSavePicker}>
         <Pressable style={styles.backdrop} onPress={closeSavePicker} />
-        <View style={[styles.sheet, { backgroundColor: colors.surface }]}> 
+        <View style={[styles.sheet, { backgroundColor: colors.surface }, sheetResponsiveStyle]}> 
           <View style={[styles.sheetHandle, { backgroundColor: colors.border }]} />
           <ThemedText type="defaultSemiBold" style={{ color: colors.text, fontSize: 18 }}>
             Save to...

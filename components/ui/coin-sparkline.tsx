@@ -171,18 +171,43 @@ export function CoinSparkline({
 
         if (!active) return;
 
-        if (snapErr || !snaps || snaps.length < 2) {
+        if (snapErr) {
           setRawSeries(null);
           return;
         }
 
-        const parsed = snaps
+        let parsed = (snaps ?? [])
           .map((row: any) => ({
             ts: String(row.ts ?? ''),
             price: row.price_usd != null ? Number(row.price_usd) : NaN,
             volume24h: row.volume_24h_usd != null ? Number(row.volume_24h_usd) : null,
           }))
           .filter((row) => row.ts && Number.isFinite(row.price));
+
+        if (parsed.length < 2) {
+          const { data: fallbackSnaps, error: fallbackErr } = await supabase
+            .from('coin_snapshots')
+            .select('ts, price_usd, volume_24h_usd')
+            .eq('coin_id', resolvedCoinId)
+            .order('ts', { ascending: false })
+            .limit(Math.min(historyLimit, 72));
+
+          if (!active) return;
+
+          if (fallbackErr) {
+            setRawSeries(null);
+            return;
+          }
+
+          parsed = (fallbackSnaps ?? [])
+            .map((row: any) => ({
+              ts: String(row.ts ?? ''),
+              price: row.price_usd != null ? Number(row.price_usd) : NaN,
+              volume24h: row.volume_24h_usd != null ? Number(row.volume_24h_usd) : null,
+            }))
+            .filter((row) => row.ts && Number.isFinite(row.price))
+            .reverse();
+        }
 
         if (parsed.length < 2) {
           setRawSeries(null);

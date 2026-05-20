@@ -24,6 +24,13 @@ type AdminStatusPayload = {
   };
   ingest: {
     runCount: number;
+    recentRuns: {
+      id: number;
+      status: string;
+      started_at: string;
+      finished_at: string | null;
+      error: string | null;
+    }[];
     lastRun: {
       id: number;
       status: string;
@@ -55,9 +62,20 @@ type AdminStatusPayload = {
     latestSnapshotTs: string | null;
   };
   ops: {
+    usersCount: number | null;
+    watchlistUsersCount: number;
     watchlistsCount: number;
     watchlistItemsCount: number;
     activityEventsCount: number;
+    avgWatchlistsPerUser: number;
+    avgItemsPerWatchlist: number;
+    topSavedCoins: {
+      coinId: string;
+      symbol: string;
+      name: string;
+      saveCount: number;
+      userCount: number;
+    }[];
   };
   moderation: {
     available: boolean;
@@ -72,7 +90,7 @@ export default function AdminScreen() {
   const { t } = useSettings();
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
-  const { mode, syncState, symbols } = useWatchlist();
+  const { mode, syncState } = useWatchlist();
   const [rows, setRows] = useState<CoinMarketRow[]>([]);
   const [edgeStatus, setEdgeStatus] = useState<AdminStatusPayload | null>(null);
   const [accessMode, setAccessMode] = useState<AccessMode>('pending');
@@ -214,6 +232,16 @@ export default function AdminScreen() {
     () => [...rows].sort((a, b) => (b.volume_24h_usd ?? 0) - (a.volume_24h_usd ?? 0))[0] ?? null,
     [rows]
   );
+  const usersCount = edgeStatus?.ops.usersCount ?? null;
+  const watchlistUsersCount = edgeStatus?.ops.watchlistUsersCount ?? 0;
+  const topSavedCoins = edgeStatus?.ops.topSavedCoins ?? [];
+  const avgWatchlistsPerUser = edgeStatus?.ops.avgWatchlistsPerUser ?? 0;
+  const avgItemsPerWatchlist = edgeStatus?.ops.avgItemsPerWatchlist ?? 0;
+  const positive24hCount = rows.filter((row) => (row.change_24h_pct ?? 0) > 0).length;
+  const negative24hCount = rows.filter((row) => (row.change_24h_pct ?? 0) < 0).length;
+  const flat24hCount = Math.max(0, rows.length - positive24hCount - negative24hCount);
+  const recentRuns = edgeStatus?.ingest.recentRuns ?? [];
+  const topSavedMaxUsers = Math.max(1, ...topSavedCoins.map((item) => item.userCount));
   const stalePreview = useMemo(
     () =>
       [...rows]
@@ -313,10 +341,10 @@ export default function AdminScreen() {
           <View style={styles.heroHeader}>
             <View style={{ flex: 1 }}>
               <ThemedText type="title" style={{ color: colors.text }}>
-                {t('AdminPanelTitle')}
+                Control tower
               </ThemedText>
               <ThemedText style={{ color: colors.textSecondary, marginTop: 6, lineHeight: 20 }}>
-                {t('AdminPanelSubtitle')}
+                Monitor feed health, adoption, and the coins people save most.
               </ThemedText>
             </View>
             <View style={[styles.statusPill, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
@@ -330,7 +358,25 @@ export default function AdminScreen() {
             <AdminStatCard
               label="Tracked coins"
               value={`${edgeStatus?.coinData.coinsCount ?? rows.length}`}
-              detail={privilegedStatus === 'edge' ? 'privileged count' : 'public market rows'}
+              detail={privilegedStatus === 'edge' ? 'live catalog' : 'public market rows'}
+              colors={colors}
+            />
+            <AdminStatCard
+              label="Users"
+              value={usersCount == null ? '--' : formatCompactNumber(usersCount)}
+              detail={usersCount == null ? 'privileged auth count unavailable' : 'auth accounts'}
+              colors={colors}
+            />
+            <AdminStatCard
+              label="Watchlist users"
+              value={formatCompactNumber(watchlistUsersCount)}
+              detail="users with saved lists"
+              colors={colors}
+            />
+            <AdminStatCard
+              label="Saved items"
+              value={formatCompactNumber(edgeStatus?.ops.watchlistItemsCount ?? 0)}
+              detail={`${formatCompactNumber(edgeStatus?.ops.watchlistsCount ?? 0)} watchlists`}
               colors={colors}
             />
             <AdminStatCard
@@ -339,11 +385,10 @@ export default function AdminScreen() {
               detail={effectiveLatestTimestamp ? formatRelativeTime(effectiveLatestTimestamp) : 'no timestamp'}
               colors={colors}
             />
-            <AdminStatCard label="Saved mode" value={mode === 'account' ? 'Account' : 'Local'} detail={`${symbols.length} saved`} colors={colors} />
             <AdminStatCard
-              label="Backend"
-              value={privilegedStatus === 'edge' ? 'Privileged' : 'Fallback'}
-              detail={privilegedStatus === 'edge' ? 'edge function live' : 'client-only proxy'}
+              label="Run failures"
+              value={`${edgeStatus?.ingest.failedRuns24h ?? 0}`}
+              detail="last 24h"
               colors={colors}
             />
           </View>
@@ -365,7 +410,7 @@ export default function AdminScreen() {
 
         {accessMessage ? (
           <View style={[styles.sectionCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <ThemedText style={{ color: colors.text, fontWeight: '700' }}>{t('AdminAccessModeNote')}</ThemedText>
+            <ThemedText style={{ color: colors.text, fontWeight: '700' }}>Mode note</ThemedText>
             <ThemedText style={{ color: colors.textSecondary, marginTop: 6, lineHeight: 20 }}>
               {accessMessage}
             </ThemedText>
@@ -374,74 +419,123 @@ export default function AdminScreen() {
 
         <View style={[styles.sectionCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <ThemedText type="subtitle" style={{ color: colors.text, fontSize: 18 }}>
-            {t('AdminBackendAvailability')}
+            Market breadth
           </ThemedText>
           <ThemedText style={{ color: colors.textSecondary, marginTop: 6, lineHeight: 20 }}>
-            {t('AdminBackendAvailabilityBody')}
+            Positive vs negative 24h movers across the current live market set.
           </ThemedText>
 
-          <View style={styles.infoRows}>
-            <InfoRow label={t('AdminEmailLabel')} value={user.email ?? '--'} colors={colors} />
-            <InfoRow label={t('AdminClientAllowlistConfigured')} value={clientAdminConfigured ? 'yes' : 'no'} colors={colors} />
-            <InfoRow label={t('AdminClientFallbackAllowed')} value={clientAdminAllowed ? 'yes' : 'no'} colors={colors} />
-            <InfoRow label={t('AdminPrivilegedSource')} value={privilegedStatus === 'edge' ? 'admin-status function' : 'public fallback'} valueColor={privilegedStatus === 'edge' ? colors.success : '#FFB020'} colors={colors} />
-            <InfoRow label={t('AdminBackendAllowlistSource')} value={edgeStatus ? edgeStatus.admin.allowlistSource : '--'} colors={colors} />
-            <InfoRow
-              label={t('AdminFunctionDeployState')}
-              value={accessMode === 'edge' ? t('AdminAvailable') : accessMode === 'fallback' ? t('AdminUnavailableFallback') : t('AdminUnknown')}
-              colors={colors}
-            />
+          <View style={styles.breadthBar}>
+            <View style={[styles.breadthSegment, { flex: positive24hCount || 1, backgroundColor: colors.success }]} />
+            <View style={[styles.breadthSegment, { flex: flat24hCount || 1, backgroundColor: colors.textTertiary }]} />
+            <View style={[styles.breadthSegment, { flex: negative24hCount || 1, backgroundColor: colors.danger }]} />
+          </View>
+
+          <View style={styles.legendRow}>
+            <LegendChip label={`Up ${positive24hCount}`} color={colors.success} colors={colors} />
+            <LegendChip label={`Flat ${flat24hCount}`} color={colors.textTertiary} colors={colors} />
+            <LegendChip label={`Down ${negative24hCount}`} color={colors.danger} colors={colors} />
           </View>
         </View>
 
         <View style={[styles.sectionCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <ThemedText type="subtitle" style={{ color: colors.text, fontSize: 18 }}>
-            {t('AdminIngestHealth')}
+            Ingest pulse
           </ThemedText>
           <ThemedText style={{ color: colors.textSecondary, marginTop: 6, lineHeight: 20 }}>
-            {privilegedStatus === 'edge'
-              ? t('AdminIngestHealthPrivilegedBody')
-              : t('AdminIngestHealthFallbackBody')}
+            Recent run strip plus the latest feed timestamp.
           </ThemedText>
 
+          <RunPulse runs={recentRuns} colors={colors} />
+
           <View style={styles.infoRows}>
-            <InfoRow label={t('AdminFeedStatus')} value={effectiveFeedHealth.toUpperCase()} valueColor={effectiveFeedHealthTone} colors={colors} />
-            <InfoRow label={t('AdminLatestSnapshot')} value={effectiveLatestTimestamp ? new Date(effectiveLatestTimestamp).toLocaleString() : '--'} colors={colors} />
-            <InfoRow label={t('Admin1hChangeGaps')} value={`${missing1h}`} colors={colors} />
-            <InfoRow label={t('Admin24hChangeGaps')} value={`${missing24h}`} colors={colors} />
-            {edgeStatus ? (
-              <>
-                <InfoRow label={t('AdminIngestRunsSampled')} value={`${edgeStatus.ingest.runCount}`} colors={colors} />
-                <InfoRow label={t('AdminFailedRuns24h')} value={`${edgeStatus.ingest.failedRuns24h}`} valueColor={edgeStatus.ingest.failedRuns24h > 0 ? colors.danger : colors.success} colors={colors} />
-                <InfoRow label={t('AdminLastRun')} value={edgeStatus.ingest.lastRun ? `${edgeStatus.ingest.lastRun.status} · ${formatRelativeTime(edgeStatus.ingest.lastRun.started_at)}` : '--'} colors={colors} />
-                {edgeStatus.ingest.lastFailure?.error ? (
-                  <InfoRow label={t('AdminLastFailure')} value={truncate(edgeStatus.ingest.lastFailure.error, 52)} valueColor={colors.danger} colors={colors} />
-                ) : null}
-              </>
+            <InfoRow label="Feed status" value={effectiveFeedHealth.toUpperCase()} valueColor={effectiveFeedHealthTone} colors={colors} />
+            <InfoRow label="Latest snapshot" value={effectiveLatestTimestamp ? new Date(effectiveLatestTimestamp).toLocaleString() : '--'} colors={colors} />
+            <InfoRow label="1h gaps" value={`${missing1h}`} colors={colors} />
+            <InfoRow label="24h gaps" value={`${missing24h}`} colors={colors} />
+            <InfoRow label="Recent runs" value={`${edgeStatus?.ingest.runCount ?? 0}`} colors={colors} />
+            <InfoRow label="Failed runs (24h)" value={`${edgeStatus?.ingest.failedRuns24h ?? 0}`} valueColor={(edgeStatus?.ingest.failedRuns24h ?? 0) > 0 ? colors.danger : colors.success} colors={colors} />
+            {edgeStatus?.ingest.lastFailure?.error ? (
+              <InfoRow label="Last failure" value={truncate(edgeStatus.ingest.lastFailure.error, 52)} valueColor={colors.danger} colors={colors} />
             ) : null}
           </View>
         </View>
 
         <View style={[styles.sectionCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <ThemedText type="subtitle" style={{ color: colors.text, fontSize: 18 }}>
-            {t('AdminCoinDataStatus')}
+            Adoption
+          </ThemedText>
+          <ThemedText style={{ color: colors.textSecondary, marginTop: 6, lineHeight: 20 }}>
+            How users are actually using saved coins and watchlists right now.
+          </ThemedText>
+
+          <View style={styles.metricsGrid}>
+            <AdminStatCard label="Users with lists" value={formatCompactNumber(watchlistUsersCount)} detail={usersCount ? `${Math.round((watchlistUsersCount / usersCount) * 100)}% of users` : 'watchlist owners'} colors={colors} />
+            <AdminStatCard label="Avg lists / user" value={avgWatchlistsPerUser ? avgWatchlistsPerUser.toFixed(1) : '0.0'} detail="named list density" colors={colors} />
+            <AdminStatCard label="Avg items / list" value={avgItemsPerWatchlist ? avgItemsPerWatchlist.toFixed(1) : '0.0'} detail="saves per watchlist" colors={colors} />
+            <AdminStatCard label="Activity events" value={formatCompactNumber(edgeStatus?.ops.activityEventsCount ?? 0)} detail="feed of tracked actions" colors={colors} />
+          </View>
+        </View>
+
+        <View style={[styles.sectionCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <ThemedText type="subtitle" style={{ color: colors.text, fontSize: 18 }}>
+            Most saved by users
+          </ThemedText>
+          <ThemedText style={{ color: colors.textSecondary, marginTop: 6, lineHeight: 20 }}>
+            Distinct users first, raw saves second.
+          </ThemedText>
+
+          {topSavedCoins.length ? (
+            <View style={styles.topSavedList}>
+              {topSavedCoins.map((coin) => (
+                <TouchableOpacity
+                  key={coin.coinId}
+                  style={styles.savedRow}
+                  onPress={() => router.push({ pathname: '/coin' as any, params: { symbol: coin.symbol } })}
+                >
+                  <View style={styles.savedRowHeader}>
+                    <View>
+                      <ThemedText style={{ color: colors.text, fontWeight: '700' }}>{coin.symbol}</ThemedText>
+                      <ThemedText style={{ color: colors.textSecondary, fontSize: 12, marginTop: 2 }}>{coin.name}</ThemedText>
+                    </View>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <ThemedText style={{ color: colors.text, fontWeight: '700' }}>{coin.userCount} users</ThemedText>
+                      <ThemedText style={{ color: colors.textTertiary, fontSize: 12, marginTop: 2 }}>{coin.saveCount} saves</ThemedText>
+                    </View>
+                  </View>
+                  <View style={[styles.savedBarTrack, { backgroundColor: colors.surfaceElevated }]}>
+                    <View
+                      style={[
+                        styles.savedBarFill,
+                        {
+                          backgroundColor: colors.primary,
+                          width: `${Math.max(8, Math.round((coin.userCount / topSavedMaxUsers) * 100))}%`,
+                        },
+                      ]}
+                    />
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          ) : (
+            <ThemedText style={{ color: colors.textSecondary, marginTop: 12 }}>
+              No saved-coin activity has been recorded yet.
+            </ThemedText>
+          )}
+        </View>
+
+        <View style={[styles.sectionCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <ThemedText type="subtitle" style={{ color: colors.text, fontSize: 18 }}>
+            Data quality
           </ThemedText>
 
           <View style={styles.infoRows}>
-            <InfoRow label={t('AdminMissingPrices')} value={`${missingPrices}`} colors={colors} />
-            {edgeStatus ? (
-              <>
-                <InfoRow label={t('AdminSnapshotsStored')} value={formatCompactNumber(edgeStatus.coinData.snapshotsCount)} colors={colors} />
-                <InfoRow label={t('AdminWhaleMetricRows')} value={`${edgeStatus.coinData.whaleMetricsCount}`} valueColor={edgeStatus.coinData.whaleMetricsCount > 0 ? colors.success : '#FFB020'} colors={colors} />
-                <InfoRow label={t('AdminTopTraderRows')} value={`${edgeStatus.coinData.topTradersCount}`} valueColor={edgeStatus.coinData.topTradersCount > 0 ? colors.success : '#FFB020'} colors={colors} />
-              </>
-            ) : null}
-            <InfoRow
-              label={t('AdminTopVolumeLeader')}
-              value={topVolumeLeader ? `${topVolumeLeader.symbol} · ${formatCompactDollars(topVolumeLeader.volume_24h_usd)}` : '--'}
-              colors={colors}
-            />
-            <InfoRow label={t('AdminWatchlistSync')} value={mode === 'account' ? syncState : 'local-only'} colors={colors} />
+            <InfoRow label="Missing prices" value={`${missingPrices}`} colors={colors} />
+            <InfoRow label="Snapshots stored" value={formatCompactNumber(edgeStatus?.coinData.snapshotsCount ?? 0)} colors={colors} />
+            <InfoRow label="Whale metric rows" value={`${edgeStatus?.coinData.whaleMetricsCount ?? 0}`} valueColor={(edgeStatus?.coinData.whaleMetricsCount ?? 0) > 0 ? colors.success : '#FFB020'} colors={colors} />
+            <InfoRow label="Top trader rows" value={`${edgeStatus?.coinData.topTradersCount ?? 0}`} valueColor={(edgeStatus?.coinData.topTradersCount ?? 0) > 0 ? colors.success : '#FFB020'} colors={colors} />
+            <InfoRow label="Top volume leader" value={topVolumeLeader ? `${topVolumeLeader.symbol} · ${formatCompactDollars(topVolumeLeader.volume_24h_usd)}` : '--'} colors={colors} />
+            <InfoRow label="Viewer mode" value={mode === 'account' ? `Account · ${syncState}` : 'Local only'} colors={colors} />
           </View>
 
           <View style={styles.previewList}>
@@ -463,17 +557,16 @@ export default function AdminScreen() {
 
         <View style={[styles.sectionCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <ThemedText type="subtitle" style={{ color: colors.text, fontSize: 18 }}>
-            {t('AdminModerationOps')}
+            Access & backend
           </ThemedText>
 
-          {edgeStatus ? (
-            <View style={styles.infoRows}>
-              <InfoRow label={t('AdminWatchlistsCount')} value={`${edgeStatus.ops.watchlistsCount}`} colors={colors} />
-              <InfoRow label={t('AdminWatchlistItemsCount')} value={`${edgeStatus.ops.watchlistItemsCount}`} colors={colors} />
-              <InfoRow label={t('AdminActivityEventsCount')} value={`${edgeStatus.ops.activityEventsCount}`} colors={colors} />
-              <InfoRow label={t('AdminModerationQueue')} value={edgeStatus.moderation.available ? t('AdminAvailable') : t('AdminNotAvailable')} valueColor={edgeStatus.moderation.available ? colors.success : '#FFB020'} colors={colors} />
-            </View>
-          ) : null}
+          <View style={styles.infoRows}>
+            <InfoRow label="Admin email" value={user.email ?? '--'} colors={colors} />
+            <InfoRow label="Client allowlist configured" value={clientAdminConfigured ? 'yes' : 'no'} colors={colors} />
+            <InfoRow label="Client admin allowed" value={clientAdminAllowed ? 'yes' : 'no'} colors={colors} />
+            <InfoRow label="Source" value={privilegedStatus === 'edge' ? 'admin-status function' : 'public fallback'} valueColor={privilegedStatus === 'edge' ? colors.success : '#FFB020'} colors={colors} />
+            <InfoRow label="Backend allowlist source" value={edgeStatus ? edgeStatus.admin.allowlistSource : '--'} colors={colors} />
+          </View>
 
           <View style={styles.statusList}>
             <StatusRow
@@ -486,8 +579,8 @@ export default function AdminScreen() {
               icon="clock.badge.exclamationmark"
               tone={colors.primary}
               text={privilegedStatus === 'edge'
-                ? 'Privileged ops view is active through the protected admin function.'
-                : 'Current ops view is still on public fallback data until the admin function is deployed.'}
+                ? 'Privileged dashboard is active through the protected admin function.'
+                : 'Current dashboard is still on public fallback data until the admin function is deployed.'}
               colors={colors}
             />
             <StatusRow
@@ -502,12 +595,6 @@ export default function AdminScreen() {
               icon="bubble.left.and.bubble.right"
               tone={colors.text}
               text={edgeStatus?.moderation.reason ?? 'Community moderation queue is a placeholder until posts/comments ship.'}
-              colors={colors}
-            />
-            <StatusRow
-              icon="server.rack"
-              tone={colors.text}
-              text="Repo now includes supabase/functions/admin-status with JWT verification; deploy it to replace fallback mode with live privileged metrics."
               colors={colors}
             />
           </View>
@@ -631,6 +718,42 @@ function StatusRow({
   );
 }
 
+function RunPulse({ runs, colors }: { runs: AdminStatusPayload['ingest']['recentRuns']; colors: any }) {
+  if (!runs?.length) {
+    return (
+      <View style={[styles.infoCardInline, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
+        <ThemedText style={{ color: colors.textSecondary }}>No recent ingest runs recorded.</ThemedText>
+      </View>
+    );
+  }
+
+  const ordered = [...runs].reverse();
+  return (
+    <View style={styles.runPulseWrap}>
+      {ordered.map((run) => {
+        const success = run.status === 'success' || run.status === 'ok';
+        const running = run.status === 'running';
+        const barColor = running ? '#FFB020' : success ? colors.success : colors.danger;
+        return (
+          <View key={`${run.id}-${run.started_at}`} style={styles.runPulseItem}>
+            <View style={[styles.runPulseBar, { backgroundColor: barColor, opacity: running ? 0.75 : 1 }]} />
+            <ThemedText style={{ color: colors.textTertiary, fontSize: 10 }}>{run.id}</ThemedText>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+function LegendChip({ label, color, colors }: { label: string; color: string; colors: any }) {
+  return (
+    <View style={[styles.legendChip, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
+      <View style={[styles.legendDot, { backgroundColor: color }]} />
+      <ThemedText style={{ color: colors.textSecondary, fontSize: 12, fontWeight: '600' }}>{label}</ThemedText>
+    </View>
+  );
+}
+
 function formatCompactDollars(value: number | null) {
   if (value == null) return '--';
   return new Intl.NumberFormat('en-US', {
@@ -709,12 +832,86 @@ const styles = StyleSheet.create({
   previewList: {
     marginTop: 16,
   },
+  infoCardInline: {
+    marginTop: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 12,
+  },
+  breadthBar: {
+    marginTop: 14,
+    height: 14,
+    borderRadius: 999,
+    overflow: 'hidden',
+    flexDirection: 'row',
+  },
+  breadthSegment: {
+    height: '100%',
+  },
+  legendRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 12,
+  },
+  legendChip: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  legendDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  runPulseWrap: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 6,
+    marginTop: 14,
+    paddingBottom: 4,
+  },
+  runPulseItem: {
+    alignItems: 'center',
+    gap: 6,
+  },
+  runPulseBar: {
+    width: 12,
+    height: 36,
+    borderRadius: 6,
+  },
   previewRow: {
     paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: 12,
+  },
+  topSavedList: {
+    marginTop: 14,
+    gap: 12,
+  },
+  savedRow: {
+    gap: 8,
+  },
+  savedRowHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+    alignItems: 'center',
+  },
+  savedBarTrack: {
+    height: 10,
+    borderRadius: 999,
+    overflow: 'hidden',
+  },
+  savedBarFill: {
+    height: '100%',
+    borderRadius: 999,
   },
   statusList: {
     marginTop: 14,

@@ -86,6 +86,54 @@ async function resolveAdminAccess(adminClient, email) {
   };
 }
 
+async function countUsers(adminClient) {
+  const perPage = 1000;
+  let page = 1;
+  let total = 0;
+
+  while (true) {
+    const { data, error } = await adminClient.auth.admin.listUsers({ page, perPage });
+    if (error) throw error;
+
+    const users = data?.users ?? [];
+    total += users.length;
+    if (users.length < perPage) break;
+    page += 1;
+    if (page > 1000) break;
+  }
+
+  return total;
+}
+
+function buildTopSavedCoins(watchlistsRows, itemRows) {
+  const userIdByWatchlistId = new Map((watchlistsRows ?? []).map((row) => [row.id, row.user_id]));
+  const savesByCoinId = new Map();
+
+  for (const item of itemRows ?? []) {
+    const userId = userIdByWatchlistId.get(item.watchlist_id);
+    const entry = savesByCoinId.get(item.coin_id) ?? {
+      coinId: item.coin_id,
+      saveCount: 0,
+      users: new Set(),
+    };
+    entry.saveCount += 1;
+    if (userId) entry.users.add(userId);
+    savesByCoinId.set(item.coin_id, entry);
+  }
+
+  return [...savesByCoinId.values()]
+    .map((entry) => ({
+      coinId: entry.coinId,
+      saveCount: entry.saveCount,
+      userCount: entry.users.size,
+    }))
+    .sort((a, b) => {
+      if (b.userCount !== a.userCount) return b.userCount - a.userCount;
+      return b.saveCount - a.saveCount;
+    })
+    .slice(0, 8);
+}
+
 Deno.serve(async (req: Request) => {
   try {
     if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !SUPABASE_SERVICE_ROLE_KEY) {
@@ -123,22 +171,22 @@ Deno.serve(async (req: Request) => {
     }
 
     const [
+      usersCountResult,
       { count: coinsCount, error: coinsError },
       { count: snapshotsCount, error: snapshotsError },
       { count: whaleMetricsCount, error: whaleMetricsError },
       { count: topTradersCount, error: topTradersError },
-      { count: watchlistsCount, error: watchlistsError },
-      { count: watchlistItemsCount, error: watchlistItemsError },
       { count: activityEventsCount, error: activityEventsError },
       { data: latestSnapshot, error: latestSnapshotError },
       { data: ingestRuns, error: ingestRunsError },
+      { data: watchlistsRows, error: watchlistsError },
+      { data: watchlistItemsRows, error: watchlistItemsError },
     ] = await Promise.all([
+      countUsers(adminClient).then((count) => ({ count })).catch((error) => ({ count: null, error })),
       adminClient.from('coins').select('id', { count: 'planned', head: true }),
       adminClient.from('coin_snapshots').select('id', { count: 'planned', head: true }),
       adminClient.from('coin_whale_metrics').select('id', { count: 'planned', head: true }),
       adminClient.from('coin_top_traders').select('id', { count: 'planned', head: true }),
-      adminClient.from('watchlists').select('id', { count: 'planned', head: true }),
-      adminClient.from('watchlist_items').select('id', { count: 'planned', head: true }),
       adminClient.from('activity_events').select('id', { count: 'planned', head: true }),
       adminClient
         .from('coin_snapshots')
@@ -151,18 +199,21 @@ Deno.serve(async (req: Request) => {
         .select('id, status, started_at, finished_at, error')
         .order('started_at', { ascending: false })
         .limit(30),
+      adminClient.from('watchlists').select('id, user_id, name, is_default, updated_at').order('updated_at', { ascending: false }),
+      adminClient.from('watchlist_items').select('watchlist_id, coin_id, created_at'),
     ]);
 
     const firstError = [
+      usersCountResult.error,
       coinsError,
       snapshotsError,
       whaleMetricsError,
       topTradersError,
-      watchlistsError,
-      watchlistItemsError,
       activityEventsError,
       latestSnapshotError,
       ingestRunsError,
+      watchlistsError,
+      watchlistItemsError,
     ].find(Boolean);
 
     if (firstError) {
@@ -180,6 +231,44 @@ Deno.serve(async (req: Request) => {
       return Date.now() - startedAt <= 24 * 60 * 60 * 1000;
     }).length;
 
+    const watchlists = watchlistsRows ?? [];
+    const watchlistItems = watchlistItemsRows ?? [];
+    const watchlistUsersCount = new Set(watchlists.map((row) => row.user_id).filter(Boolean)).size;
+    const topSavedBase = buildTopSavedCoins(watchlists, watchlistItems);
+    const topSavedCoinIds = topSavedBase.map((row) => row.coinId).filter(Boolean);
+    const coinMetaById = new Map();
+
+    if (topSavedCoinIds.length) {
+      const { data: topCoins, error: topCoinsError } = await adminClient
+        .from('coins')
+        .select('id, symbol, name')
+        .in('id', topSavedCoinIds);
+
+      if (topCoinsError) {
+        return json({ error: topCoinsError.message, code: 'admin_query_failed' }, 500);
+      }
+
+      for (const coin of topCoins ?? []) {
+        coinMetaById.set(coin.id, coin);
+      }
+    }
+
+    const topSavedCoins = topSavedBase.map((row) => {
+      const coin = coinMetaById.get(row.coinId);
+      return {
+        coinId: row.coinId,
+        symbol: coin?.symbol ?? '--',
+        name: coin?.name ?? 'Unknown coin',
+        saveCount: row.saveCount,
+        userCount: row.userCount,
+      };
+    });
+
+    const watchlistsCount = watchlists.length;
+    const watchlistItemsCount = watchlistItems.length;
+    const avgWatchlistsPerUser = watchlistUsersCount > 0 ? watchlistsCount / watchlistUsersCount : 0;
+    const avgItemsPerWatchlist = watchlistsCount > 0 ? watchlistItemsCount / watchlistsCount : 0;
+
     return json({
       actor: {
         email: user.email ?? null,
@@ -191,6 +280,7 @@ Deno.serve(async (req: Request) => {
       },
       ingest: {
         runCount: runs.length,
+        recentRuns: runs.slice(0, 12),
         lastRun,
         lastSuccess,
         lastFailure,
@@ -204,9 +294,14 @@ Deno.serve(async (req: Request) => {
         latestSnapshotTs: latestSnapshot?.ts ?? null,
       },
       ops: {
-        watchlistsCount: watchlistsCount ?? 0,
-        watchlistItemsCount: watchlistItemsCount ?? 0,
+        usersCount: usersCountResult.count,
+        watchlistUsersCount,
+        watchlistsCount,
+        watchlistItemsCount,
         activityEventsCount: activityEventsCount ?? 0,
+        avgWatchlistsPerUser,
+        avgItemsPerWatchlist,
+        topSavedCoins,
       },
       moderation: {
         available: false,

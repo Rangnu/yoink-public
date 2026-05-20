@@ -148,16 +148,6 @@ export default function MenuScreen() {
           <StatCard label={t('SyncLabel')} value={user ? t('AccountMode') : t('LocalMode')} detail={user ? t('AuthSessionReady') : t('DeviceOnlyMode')} colors={colors} />
         </View>
 
-        <View style={[styles.infoCard, { backgroundColor: colors.surface, borderColor: colors.border }]}> 
-          <ThemedText style={{ color: colors.text, fontWeight: '700' }}>{t('ProductStatus')}</ThemedText>
-          <View style={styles.statusList}>
-            <StatusRow icon="checkmark.circle.fill" text={t('AuthFlowLive')} tone={colors.success} colors={colors} />
-            <StatusRow icon="checkmark.circle.fill" text={t('MarketFeedPowered')} tone={colors.success} colors={colors} />
-            <StatusRow icon="bookmark.fill" text={t('SavedCoinsLocalOnly')} tone={colors.primary} colors={colors} />
-            <StatusRow icon="scope" text={t('ScoutersPresetsLive')} tone={colors.text} colors={colors} />
-          </View>
-        </View>
-
         <Section title={t('Settings')} icon="gearshape.fill" colors={colors}>
           <MenuRow icon="paintbrush.fill" label={t('Appearance')} onPress={() => router.push('/settings/appearance')} colors={colors} />
           <MenuRow icon="globe" label={t('Language')} onPress={() => router.push('/settings/language')} colors={colors} divider colorsObj={colors} />
@@ -305,15 +295,6 @@ function StatCard({ label, value, detail, colors }: { label: string; value: stri
   );
 }
 
-function StatusRow({ icon, text, tone, colors }: { icon: any; text: string; tone: string; colors: any }) {
-  return (
-    <View style={styles.statusRow}>
-      <IconSymbol name={icon} size={16} color={tone} />
-      <ThemedText style={{ color: colors.textSecondary, fontSize: 13 }}>{text}</ThemedText>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -385,20 +366,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 14,
     padding: 14,
-  },
-  infoCard: {
-    borderRadius: 14,
-    borderWidth: 1,
-    padding: 14,
-  },
-  statusList: {
-    gap: 10,
-    marginTop: 12,
-  },
-  statusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
   },
   section: {
     gap: 12,

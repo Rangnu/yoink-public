@@ -26,7 +26,7 @@ type ExploreListRow = {
 export default function ExploreScreen() {
   const { colors } = useTheme();
   const { t } = useSettings();
-  const { isSaved, toggleSaved } = useWatchlist();
+  const { isSaved, toggleSaved, mode } = useWatchlist();
   const [refreshing, setRefreshing] = useState(false);
   const [stocksTab, setStocksTab] = useState<'volume' | 'trades' | 'gainers' | 'losers' | 'popular'>('volume');
   const [coinsData, setCoinsData] = useState<any[]>([]);
@@ -285,10 +285,10 @@ export default function ExploreScreen() {
 
         <View style={[styles.infoCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <ThemedText type="defaultSemiBold" style={{ color: colors.text }}>
-            Explore is live-data first now
+            {t('ExploreLiveDataFirstTitle')}
           </ThemedText>
           <ThemedText style={{ color: colors.textSecondary, marginTop: 6, lineHeight: 20 }}>
-            Tap a coin row to open details. Bookmark icons save coins locally on this device while shared watchlists and alerts are still being built.
+            {mode === 'account' ? t('ExploreSavedAccountBody') : t('ExploreSavedGuestBody')}
           </ThemedText>
         </View>
       </ScrollView>

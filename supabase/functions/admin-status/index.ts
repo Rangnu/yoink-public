@@ -133,13 +133,13 @@ Deno.serve(async (req: Request) => {
       { data: latestSnapshot, error: latestSnapshotError },
       { data: ingestRuns, error: ingestRunsError },
     ] = await Promise.all([
-      adminClient.from('coins').select('id', { count: 'exact', head: true }),
-      adminClient.from('coin_snapshots').select('id', { count: 'exact', head: true }),
-      adminClient.from('coin_whale_metrics').select('id', { count: 'exact', head: true }),
-      adminClient.from('coin_top_traders').select('id', { count: 'exact', head: true }),
-      adminClient.from('watchlists').select('id', { count: 'exact', head: true }),
-      adminClient.from('watchlist_items').select('id', { count: 'exact', head: true }),
-      adminClient.from('activity_events').select('id', { count: 'exact', head: true }),
+      adminClient.from('coins').select('id', { count: 'planned', head: true }),
+      adminClient.from('coin_snapshots').select('id', { count: 'planned', head: true }),
+      adminClient.from('coin_whale_metrics').select('id', { count: 'planned', head: true }),
+      adminClient.from('coin_top_traders').select('id', { count: 'planned', head: true }),
+      adminClient.from('watchlists').select('id', { count: 'planned', head: true }),
+      adminClient.from('watchlist_items').select('id', { count: 'planned', head: true }),
+      adminClient.from('activity_events').select('id', { count: 'planned', head: true }),
       adminClient
         .from('coin_snapshots')
         .select('ts')
@@ -171,10 +171,11 @@ Deno.serve(async (req: Request) => {
 
     const runs = (ingestRuns ?? []) as IngestRunRow[];
     const lastRun = runs[0] ?? null;
-    const lastSuccess = runs.find((run) => run.status === 'success') ?? null;
-    const lastFailure = runs.find((run) => run.status !== 'success' && run.status !== 'running') ?? null;
+    const isSuccessStatus = (status) => status === 'success' || status === 'ok';
+    const lastSuccess = runs.find((run) => isSuccessStatus(run.status)) ?? null;
+    const lastFailure = runs.find((run) => !isSuccessStatus(run.status) && run.status !== 'running') ?? null;
     const failedRuns24h = runs.filter((run) => {
-      if (run.status === 'success' || run.status === 'running') return false;
+      if (isSuccessStatus(run.status) || run.status === 'running') return false;
       const startedAt = new Date(run.started_at).getTime();
       return Date.now() - startedAt <= 24 * 60 * 60 * 1000;
     }).length;

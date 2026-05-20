@@ -34,6 +34,10 @@ export function useAdminAccess(): AdminAccessState {
       };
     }
 
+    if (canAccessAdmin(user)) {
+      setState({ allowed: true, loading: false, source: 'client-fallback' });
+    }
+
     const check = async () => {
       try {
         const result = await invokeAdminStatus(session?.access_token);

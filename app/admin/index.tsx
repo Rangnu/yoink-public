@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Svg, { Circle } from 'react-native-svg';
+import Svg, { Circle, Path } from 'react-native-svg';
 
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -862,9 +862,23 @@ function DonutBreakdown({
   subtextColor: string;
 }) {
   const radius = (size - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * radius;
   const total = Math.max(1, segments.reduce((sum, segment) => sum + segment.value, 0));
-  let consumed = 0;
+  let currentAngle = -90;
+
+  const polarToCartesian = (cx: number, cy: number, r: number, angleInDegrees: number) => {
+    const angleInRadians = ((angleInDegrees - 90) * Math.PI) / 180.0;
+    return {
+      x: cx + r * Math.cos(angleInRadians),
+      y: cy + r * Math.sin(angleInRadians),
+    };
+  };
+
+  const describeArc = (cx: number, cy: number, r: number, startAngle: number, endAngle: number) => {
+    const start = polarToCartesian(cx, cy, r, endAngle);
+    const end = polarToCartesian(cx, cy, r, startAngle);
+    const largeArcFlag = endAngle - startAngle <= 180 ? '0' : '1';
+    return `M ${start.x} ${start.y} A ${r} ${r} 0 ${largeArcFlag} 0 ${end.x} ${end.y}`;
+  };
 
   return (
     <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
@@ -879,24 +893,19 @@ function DonutBreakdown({
         />
         {segments.map((segment, index) => {
           const fraction = segment.value / total;
-          const length = Math.max(0, circumference * fraction);
-          const offset = circumference * (1 - consumed);
-          consumed += fraction;
+          const sweep = Math.max(0, fraction * 360);
+          const startAngle = currentAngle;
+          const endAngle = currentAngle + sweep;
+          currentAngle = endAngle;
 
           return (
-            <Circle
+            <Path
               key={`${segment.color}-${index}`}
-              cx={size / 2}
-              cy={size / 2}
-              r={radius}
+              fill="none"
               stroke={segment.color}
               strokeWidth={strokeWidth}
               strokeLinecap="round"
-              fill="none"
-              strokeDasharray={`${length} ${circumference}`}
-              strokeDashoffset={offset}
-              rotation={-90}
-              origin={`${size / 2}, ${size / 2}`}
+              d={describeArc(size / 2, size / 2, radius, startAngle, endAngle)}
             />
           );
         })}

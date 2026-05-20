@@ -1,9 +1,19 @@
 import type { User } from '@supabase/supabase-js';
 
-const ADMIN_EMAILS = (process.env.EXPO_PUBLIC_ADMIN_EMAILS ?? '')
-  .split(',')
-  .map((value) => value.trim().toLowerCase())
-  .filter(Boolean);
+const STATIC_ADMIN_EMAILS = [
+  'rmfpdlxm2005@naver.com',
+  'sadjkasdn@proton.me',
+];
+
+const ADMIN_EMAILS = Array.from(
+  new Set([
+    ...STATIC_ADMIN_EMAILS,
+    ...(process.env.EXPO_PUBLIC_ADMIN_EMAILS ?? '')
+      .split(',')
+      .map((value) => value.trim().toLowerCase())
+      .filter(Boolean),
+  ])
+);
 
 export function hasAdminConfig() {
   return ADMIN_EMAILS.length > 0;

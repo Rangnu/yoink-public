@@ -642,22 +642,8 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    if (watchlistsRef.current.length !== 1) {
-      openSavePicker(normalized);
-      return;
-    }
-
-    const onlyWatchlistId = watchlistsRef.current[0]?.id ?? defaultWatchlistId ?? null;
-    if (!onlyWatchlistId) {
-      openSavePicker(normalized);
-      return;
-    }
-    if (isSaved(normalized, onlyWatchlistId)) {
-      await removeCoin(normalized, onlyWatchlistId);
-    } else {
-      await saveCoin(normalized, onlyWatchlistId);
-    }
-  }, [defaultWatchlistId, isSaved, openSavePicker, removeCoin, saveCoin, user]);
+    openSavePicker(normalized);
+  }, [openSavePicker, removeCoin, saveCoin, user]);
 
   const reload = useCallback(async () => {
     setLoading(true);

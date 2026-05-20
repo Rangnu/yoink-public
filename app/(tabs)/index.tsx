@@ -580,19 +580,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingVertical: 10,
+    paddingVertical: 8,
     borderBottomWidth: 0.5,
   },
   rowBadgeWrap: {
-    width: 42,
+    width: 36,
     alignItems: 'flex-start',
     justifyContent: 'center',
-    marginRight: 10,
+    marginRight: 8,
   },
   rowBadgeCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
@@ -604,36 +604,27 @@ const styles = StyleSheet.create({
   rowTextStack: {
     minWidth: 0,
   },
-  homeMetricPill: {
-    alignSelf: 'flex-start',
-    marginTop: 8,
-    borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-  },
   chartSection: {
-    width: 92,
+    width: 84,
     alignItems: 'center',
     justifyContent: 'center',
-    marginHorizontal: 12,
+    marginHorizontal: 10,
   },
   priceSection: {
     alignItems: 'flex-end',
-    minWidth: 90,
+    minWidth: 82,
   },
   priceBox: {
     paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingVertical: 5,
     borderRadius: 8,
-    minWidth: 76,
+    minWidth: 72,
     alignItems: 'center',
   },
-  changeInfoColumn: {
-    marginTop: 6,
+  changeInfoRow: {
+    marginTop: 4,
+    flexDirection: 'row',
+    gap: 6,
     justifyContent: 'flex-end',
     alignItems: 'flex-end',
   },
@@ -732,23 +723,13 @@ function HomeHighlightRow({
 
       <View style={styles.symbolSection}>
         <View style={styles.rowTextStack}>
-          <ThemedText style={{ color: colors.text, fontWeight: '700', fontSize: 15 }}>
+          <ThemedText style={{ color: colors.text, fontWeight: '700', fontSize: 14 }}>
             {stock.symbol}
           </ThemedText>
-          <ThemedText style={{ color: colors.textSecondary, fontSize: 12, marginTop: 2 }} numberOfLines={1}>
+          <ThemedText style={{ color: colors.textSecondary, fontSize: 11, marginTop: 1 }} numberOfLines={1}>
             {stock.name}
           </ThemedText>
         </View>
-        {stock.rank != null ? (
-          <View style={[styles.homeMetricPill, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-            <ThemedText style={{ color: colors.textTertiary, fontSize: 10, fontWeight: '700' }}>
-              MKT RANK
-            </ThemedText>
-            <ThemedText style={{ color: colors.textSecondary, fontSize: 10, fontWeight: '700' }}>
-              #{stock.rank}
-            </ThemedText>
-          </View>
-        ) : null}
       </View>
 
       <View style={[styles.chartSection, !visible && { opacity: 0.3 }]}>
@@ -756,8 +737,8 @@ function HomeHighlightRow({
           coinId={stock.coinId}
           symbol={stock.symbol}
           color={changeColor}
-          width={92}
-          height={32}
+          width={84}
+          height={28}
           range={chartRange}
           historyLimit={400}
         />
@@ -770,11 +751,11 @@ function HomeHighlightRow({
           </ThemedText>
         </View>
         {visible ? (
-          <View style={styles.changeInfoColumn}>
+          <View style={styles.changeInfoRow}>
             <ThemedText style={{ color: changeColor, fontWeight: '600', fontSize: 10 }}>
               {formatDollarMove(stock.changeValue)}
             </ThemedText>
-            <ThemedText style={{ color: changeColor, fontWeight: '600', fontSize: 10, marginTop: 2 }}>
+            <ThemedText style={{ color: changeColor, fontWeight: '600', fontSize: 10 }}>
               {isPositive ? '+' : ''}
               {stock.change}%
             </ThemedText>

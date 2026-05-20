@@ -17,6 +17,7 @@ type ExploreListRow = {
   name: string;
   p: string;
   c: string;
+  changeValue?: string;
   rank: number | null;
   metricLabel?: string;
   metricValue?: string;
@@ -66,6 +67,12 @@ export default function ExploreScreen() {
       notation: 'compact',
       maximumFractionDigits: 1,
     }).format(value);
+  };
+  const formatDollarDelta = (value: number | null) => {
+    if (value == null || !Number.isFinite(value)) return '--';
+    const abs = Math.abs(value);
+    const digits = abs >= 1000 ? 0 : abs >= 1 ? 2 : abs >= 0.01 ? 3 : 5;
+    return `${value >= 0 ? '+' : '-'}$${abs.toLocaleString(undefined, { maximumFractionDigits: digits })}`;
   };
 
   const tickerItems = useMemo(() => {
@@ -133,6 +140,10 @@ export default function ExploreScreen() {
       name: r.name ?? r.symbol ?? '',
       p: formatPrice(r.priceNum),
       c: formatChange(r.changeNum),
+      changeValue:
+        r.priceNum != null && r.changeNum != null
+          ? formatDollarDelta((r.priceNum * r.changeNum) / 100)
+          : '--',
       rank: Number.isFinite(r.rankNum) ? r.rankNum : null,
       metricLabel,
       metricValue,
@@ -241,7 +252,7 @@ export default function ExploreScreen() {
               </View>
             </View>
 
-            {stockLists[stocksTab].map((row, i) => {
+          {stockLists[stocksTab].map((row, i) => {
             const saved = isSaved(row.s);
             return (
               <ExploreMarketRow
@@ -252,6 +263,7 @@ export default function ExploreScreen() {
                 name={row.name}
                 priceLabel={row.p.startsWith('$') ? row.p : `$${row.p}`}
                 changeLabel={row.c}
+                changeValue={row.changeValue}
                 metricLabel={row.metricLabel}
                 metricValue={row.metricValue}
                 saved={saved}
@@ -306,6 +318,7 @@ function ExploreMarketRow({
   name,
   priceLabel,
   changeLabel,
+  changeValue,
   metricLabel,
   metricValue,
   saved,
@@ -319,6 +332,7 @@ function ExploreMarketRow({
   name: string;
   priceLabel: string;
   changeLabel: string;
+  changeValue?: string;
   metricLabel?: string;
   metricValue?: string;
   saved: boolean;
@@ -348,21 +362,17 @@ function ExploreMarketRow({
           <ThemedText style={{ color: colors.text, fontWeight: '700', fontSize: 14 }}>
             {symbol}
           </ThemedText>
-          <ThemedText style={{ color: colors.textSecondary, fontSize: 12, marginTop: 1 }} numberOfLines={1}>
-            {name}
-          </ThemedText>
-        </View>
-
-        {metricLabel && metricValue ? (
-          <View style={[styles.marketMetricPill, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-            <ThemedText style={{ color: colors.textTertiary, fontSize: 9, fontWeight: '700' }}>
-              {metricLabel.toUpperCase()}
+          <View style={styles.marketRowDetailLine}>
+            <ThemedText style={{ color: colors.textSecondary, fontSize: 11 }} numberOfLines={1}>
+              {name}
             </ThemedText>
-            <ThemedText style={{ color: colors.textSecondary, fontSize: 10, fontWeight: '700' }}>
-              {metricValue}
-            </ThemedText>
+            {metricLabel && metricValue ? (
+              <ThemedText style={{ color: colors.textTertiary, fontSize: 10, fontWeight: '600' }} numberOfLines={1}>
+                {metricLabel.toUpperCase()} {metricValue}
+              </ThemedText>
+            ) : null}
           </View>
-        ) : null}
+        </View>
       </View>
 
       <View style={styles.marketRowChart}>
@@ -370,8 +380,8 @@ function ExploreMarketRow({
           coinId={coinId}
           symbol={symbol}
           color={changeColor}
-          width={78}
-          height={26}
+          width={70}
+          height={24}
           range="24H"
           historyLimit={400}
         />
@@ -383,9 +393,16 @@ function ExploreMarketRow({
             {priceLabel}
           </ThemedText>
         </View>
-        <ThemedText style={{ color: changeColor, fontSize: 10, fontWeight: '600', marginTop: 5 }}>
-          {changeLabel}
-        </ThemedText>
+        <View style={styles.marketRowChangeLine}>
+          {changeValue ? (
+            <ThemedText style={{ color: changeColor, fontSize: 10, fontWeight: '600' }}>
+              {changeValue}
+            </ThemedText>
+          ) : null}
+          <ThemedText style={{ color: changeColor, fontSize: 10, fontWeight: '600' }}>
+            {changeLabel}
+          </ThemedText>
+        </View>
       </View>
 
       <TouchableOpacity
@@ -487,18 +504,18 @@ const styles = StyleSheet.create({
   marketRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
+    paddingVertical: 8,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   marketRowBadgeWrap: {
-    width: 38,
-    marginRight: 10,
+    width: 34,
+    marginRight: 8,
     alignItems: 'flex-start',
   },
   marketRowBadgeCircle: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
@@ -510,40 +527,41 @@ const styles = StyleSheet.create({
   marketRowTextStack: {
     minWidth: 0,
   },
-  marketMetricPill: {
-    alignSelf: 'flex-start',
-    marginTop: 8,
-    borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
+  marketRowDetailLine: {
+    marginTop: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
+    minWidth: 0,
   },
   marketRowChart: {
-    width: 78,
-    marginHorizontal: 10,
+    width: 70,
+    marginHorizontal: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
   marketRowPriceSection: {
     alignItems: 'flex-end',
-    minWidth: 80,
+    minWidth: 78,
   },
   marketPricePill: {
-    minWidth: 72,
+    minWidth: 68,
     alignItems: 'center',
     borderRadius: 8,
     paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingVertical: 5,
+  },
+  marketRowChangeLine: {
+    marginTop: 4,
+    flexDirection: 'row',
+    gap: 6,
   },
   marketSaveButton: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     borderWidth: 1,
-    marginLeft: 10,
+    marginLeft: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -1,13 +1,15 @@
 // January 08, 2026 23:40
 import 'react-native-reanimated';
 
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Platform, StyleSheet, View } from 'react-native';
+import { useEffect } from 'react';
 
 import { ActivityProvider } from '@/contexts/activity-context';
 import { AuthProvider } from '@/contexts/auth-context';
 import { SettingsProvider } from '@/contexts/settings-context';
+import { supabase } from '@/utils/supabase';
 import { ThemeProvider, useTheme } from '@/contexts/theme-context';
 import { WatchlistProvider } from '@/contexts/watchlist-context';
 
@@ -18,6 +20,19 @@ export const unstable_settings = {
 function RootLayoutNav() {
   const { resolvedTheme, colors } = useTheme();
   const isWeb = Platform.OS === 'web';
+  const router = useRouter();
+
+  useEffect(() => {
+    const { data: subscription } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        router.replace('/auth/update-password' as any);
+      }
+    });
+
+    return () => {
+      subscription.subscription.unsubscribe();
+    };
+  }, [router]);
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }, isWeb && styles.rootWeb]}>

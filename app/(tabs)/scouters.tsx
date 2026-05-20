@@ -346,8 +346,8 @@ export default function ScoutersScreen() {
                           <ThemedText style={{ color: changeColor, fontWeight: '700' }}>{formatCoinPercent(match.changePct)}</ThemedText>
                         </View>
                         <ThemedText style={{ color: colors.textSecondary, fontSize: 12, marginTop: 4 }} numberOfLines={1}>{match.name}</ThemedText>
-                        <View style={{ marginTop: 10 }}>
-                          <CoinSparkline symbol={match.symbol} color={changeColor} width={128} height={34} />
+                        <View style={[styles.rowChartCard, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
+                          <CoinSparkline symbol={match.symbol} color={changeColor} width={136} height={42} />
                         </View>
                         <View style={styles.metricRow}>
                           <ThemedText style={{ color: colors.textSecondary, fontSize: 12 }}>{match.primaryMetric}</ThemedText>
@@ -534,11 +534,19 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 8,
   },
+  rowChartCard: {
+    marginTop: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    alignSelf: 'flex-start',
+  },
   metricRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: 8,
-    marginTop: 10,
+    marginTop: 8,
   },
   rowRight: {
     alignItems: 'flex-end',

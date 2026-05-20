@@ -9,9 +9,8 @@ import { useAuth } from '@/contexts/auth-context';
 import { useSettings } from '@/contexts/settings-context';
 import { useTheme } from '@/contexts/theme-context';
 import { useWatchlist } from '@/contexts/watchlist-context';
-import { canAccessAdmin, hasAdminConfig } from '@/utils/admin';
+import { canAccessAdmin, hasAdminConfig, invokeAdminStatus } from '@/utils/admin';
 import { fetchCoinMarketRows, getLatestTimestamp, type CoinMarketRow } from '@/utils/coin-market';
-import { supabase } from '@/utils/supabase';
 
 type AdminStatusPayload = {
   source: 'edge-function';
@@ -89,7 +88,7 @@ export default function AdminScreen() {
   const { colors } = useTheme();
   const { t } = useSettings();
   const router = useRouter();
-  const { user, loading: authLoading } = useAuth();
+  const { user, session, loading: authLoading } = useAuth();
   const { mode, syncState } = useWatchlist();
   const [rows, setRows] = useState<CoinMarketRow[]>([]);
   const [edgeStatus, setEdgeStatus] = useState<AdminStatusPayload | null>(null);
@@ -136,21 +135,9 @@ export default function AdminScreen() {
       setError(null);
       setAccessMessage(null);
 
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      const accessToken = session?.access_token;
+      const adminStatusResult = await invokeAdminStatus(session?.access_token);
 
-      const adminStatusResult = await supabase.functions.invoke('admin-status', {
-        body: {},
-        headers: accessToken
-          ? {
-              Authorization: `Bearer ${accessToken}`,
-            }
-          : undefined,
-      });
-
-      if (!adminStatusResult.error && adminStatusResult.data) {
+      if (adminStatusResult.ok && adminStatusResult.data) {
         const nextRows = await fetchCoinMarketRows(120);
         setRows(nextRows);
         setEdgeStatus(adminStatusResult.data as AdminStatusPayload);
@@ -160,7 +147,7 @@ export default function AdminScreen() {
 
       const response = adminStatusResult.response;
       const responseStatus = response?.status;
-      const responseBody = await readFunctionErrorBody(response);
+      const responseBody = adminStatusResult.errorBody ?? await readFunctionErrorBody(response ?? undefined);
       const errorCode = responseBody?.code ?? null;
 
       if (responseStatus === 401 || responseStatus === 403) {
@@ -212,7 +199,7 @@ export default function AdminScreen() {
     } finally {
       setLoading(false);
     }
-  }, [clientAdminAllowed, readFunctionErrorBody, user]);
+  }, [clientAdminAllowed, readFunctionErrorBody, session?.access_token, user]);
 
   useEffect(() => {
     if (authLoading) return;

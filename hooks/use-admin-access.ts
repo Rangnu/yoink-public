@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import { useAuth } from '@/contexts/auth-context';
-import { canAccessAdmin } from '@/utils/admin';
-import { supabase } from '@/utils/supabase';
+import { canAccessAdmin, invokeAdminStatus } from '@/utils/admin';
 
 type AdminAccessState = {
   allowed: boolean;
@@ -11,7 +10,7 @@ type AdminAccessState = {
 };
 
 export function useAdminAccess(): AdminAccessState {
-  const { user, loading: authLoading } = useAuth();
+  const { user, session, loading: authLoading } = useAuth();
   const [state, setState] = useState<AdminAccessState>({
     allowed: false,
     loading: true,
@@ -37,22 +36,10 @@ export function useAdminAccess(): AdminAccessState {
 
     const check = async () => {
       try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-        const accessToken = session?.access_token;
-
-        const result = await supabase.functions.invoke('admin-status', {
-          body: {},
-          headers: accessToken
-            ? {
-                Authorization: `Bearer ${accessToken}`,
-              }
-            : undefined,
-        });
+        const result = await invokeAdminStatus(session?.access_token);
         if (!active) return;
 
-        if (!result.error && result.data) {
+        if (result.ok && result.data) {
           setState({ allowed: true, loading: false, source: 'backend' });
           return;
         }
@@ -85,7 +72,7 @@ export function useAdminAccess(): AdminAccessState {
     return () => {
       active = false;
     };
-  }, [authLoading, user]);
+  }, [authLoading, session?.access_token, user]);
 
   return state;
 }

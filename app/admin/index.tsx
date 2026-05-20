@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useAuth } from '@/contexts/auth-context';
+import { useSettings } from '@/contexts/settings-context';
 import { useTheme } from '@/contexts/theme-context';
 import { useWatchlist } from '@/contexts/watchlist-context';
 import { canAccessAdmin, hasAdminConfig } from '@/utils/admin';
@@ -68,6 +69,7 @@ type AccessMode = 'pending' | 'edge' | 'fallback' | 'denied' | 'backend_unavaila
 
 export default function AdminScreen() {
   const { colors } = useTheme();
+  const { t } = useSettings();
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const { mode, syncState, symbols } = useWatchlist();
@@ -219,6 +221,16 @@ export default function AdminScreen() {
         .slice(0, 5),
     [rows]
   );
+  const formatRelativeTime = useCallback((iso: string) => {
+    const diffMs = Date.now() - new Date(iso).getTime();
+    const diffMinutes = Math.max(0, Math.round(diffMs / 60000));
+    if (diffMinutes < 1) return t('RelativeJustNow');
+    if (diffMinutes < 60) return t('RelativeMinutesAgo').replace('{count}', `${diffMinutes}`);
+    const diffHours = Math.round(diffMinutes / 60);
+    if (diffHours < 24) return t('RelativeHoursAgo').replace('{count}', `${diffHours}`);
+    const diffDays = Math.round(diffHours / 24);
+    return t('RelativeDaysAgo').replace('{count}', `${diffDays}`);
+  }, [t]);
 
   const pushLogin = () =>
     router.push({ pathname: '/auth/login', params: { redirectTo: '/admin' } } as any);
@@ -239,11 +251,11 @@ export default function AdminScreen() {
       <SafeAreaView edges={['left', 'right']} style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.content}>
           <AccessCard
-            title="Sign in required"
-            body="The admin panel is protected. Sign in with an allowed admin email to review feed health and operational status."
+            title={t('AdminSignInRequiredTitle')}
+            body={t('AdminSignInRequiredBody')}
             icon="person.crop.circle.badge.exclamationmark"
             colors={colors}
-            actionLabel="Sign in"
+            actionLabel={t('AuthModeSignIn')}
             onPress={pushLogin}
           />
         </View>
@@ -256,7 +268,7 @@ export default function AdminScreen() {
       <SafeAreaView edges={['left', 'right']} style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.content}>
           <AccessCard
-            title="Access denied"
+            title={t('AdminAccessDeniedTitle')}
             body={accessMessage ?? `Signed in as ${user.email ?? 'unknown user'}, but this account is not authorized for admin access.`}
             icon="xmark.shield"
             colors={colors}
@@ -271,7 +283,7 @@ export default function AdminScreen() {
       <SafeAreaView edges={['left', 'right']} style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.content}>
           <AccessCard
-            title="Protected backend unavailable"
+            title={t('AdminBackendUnavailableTitle')}
             body={accessMessage ?? 'The admin screen needs the protected backend function or a local fallback allowlist before it can reveal operational data.'}
             icon="server.rack"
             colors={colors}
@@ -301,10 +313,10 @@ export default function AdminScreen() {
           <View style={styles.heroHeader}>
             <View style={{ flex: 1 }}>
               <ThemedText type="title" style={{ color: colors.text }}>
-                Admin panel
+                {t('AdminPanelTitle')}
               </ThemedText>
               <ThemedText style={{ color: colors.textSecondary, marginTop: 6, lineHeight: 20 }}>
-                Protected operational view for feed freshness, coin coverage, and rollout readiness.
+                {t('AdminPanelSubtitle')}
               </ThemedText>
             </View>
             <View style={[styles.statusPill, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
@@ -617,17 +629,6 @@ function StatusRow({
       </ThemedText>
     </View>
   );
-}
-
-function formatRelativeTime(iso: string) {
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const diffMinutes = Math.max(0, Math.round(diffMs / 60000));
-  if (diffMinutes < 1) return 'just now';
-  if (diffMinutes < 60) return `${diffMinutes}m ago`;
-  const diffHours = Math.round(diffMinutes / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
-  const diffDays = Math.round(diffHours / 24);
-  return `${diffDays}d ago`;
 }
 
 function formatCompactDollars(value: number | null) {

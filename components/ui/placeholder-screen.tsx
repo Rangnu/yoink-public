@@ -3,6 +3,7 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { useSettings } from '@/contexts/settings-context';
 import { useTheme } from '@/contexts/theme-context';
 
 export function PlaceholderScreen({
@@ -21,6 +22,7 @@ export function PlaceholderScreen({
   note?: string;
 }) {
   const { colors } = useTheme();
+  const { t } = useSettings();
 
   return (
     <ScrollView contentContainerStyle={styles.content} contentInsetAdjustmentBehavior="never">
@@ -45,7 +47,7 @@ export function PlaceholderScreen({
 
       {bullets.length ? (
         <View style={[styles.sectionCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <ThemedText style={{ color: colors.text, fontWeight: '700' }}>What belongs here</ThemedText>
+          <ThemedText style={{ color: colors.text, fontWeight: '700' }}>{t('PlaceholderWhatBelongsHere')}</ThemedText>
           <View style={styles.bulletList}>
             {bullets.map((bullet) => (
               <View key={bullet} style={styles.bulletRow}>

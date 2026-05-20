@@ -226,6 +226,16 @@ export default function ScoutersScreen() {
       .slice(0, 8);
   }, [scouters]);
   const lastUpdated = useMemo(() => getLatestTimestamp(marketRows), [marketRows]);
+  const formatRelativeTime = useCallback((iso: string) => {
+    const diffMs = Date.now() - new Date(iso).getTime();
+    const diffMinutes = Math.max(0, Math.round(diffMs / 60000));
+    if (diffMinutes < 1) return t('RelativeJustNow');
+    if (diffMinutes < 60) return t('RelativeMinutesAgo').replace('{count}', `${diffMinutes}`);
+    const diffHours = Math.round(diffMinutes / 60);
+    if (diffHours < 24) return t('RelativeHoursAgo').replace('{count}', `${diffHours}`);
+    const diffDays = Math.round(diffHours / 24);
+    return t('RelativeDaysAgo').replace('{count}', `${diffDays}`);
+  }, [t]);
 
   const handleViewScouter = useCallback((scouterId: string) => {
     setSelectedScouterId(scouterId);
@@ -449,17 +459,6 @@ function formatCompactDollars(value: number | null) {
     notation: 'compact',
     maximumFractionDigits: 1,
   }).format(value);
-}
-
-function formatRelativeTime(iso: string) {
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const diffMinutes = Math.max(0, Math.round(diffMs / 60000));
-  if (diffMinutes < 1) return 'just now';
-  if (diffMinutes < 60) return `${diffMinutes}m ago`;
-  const diffHours = Math.round(diffMinutes / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
-  const diffDays = Math.round(diffHours / 24);
-  return `${diffDays}d ago`;
 }
 
 const styles = StyleSheet.create({

@@ -54,6 +54,16 @@ export default function MenuScreen() {
     if (feedStatus === 'error') return t('OfflineStatus');
     return t('WaitingForIngest');
   }, [feedStatus, t]);
+  const formatRelativeTime = useCallback((iso: string) => {
+    const diffMs = Date.now() - new Date(iso).getTime();
+    const diffMinutes = Math.max(0, Math.round(diffMs / 60000));
+    if (diffMinutes < 1) return t('RelativeJustNow');
+    if (diffMinutes < 60) return t('RelativeMinutesAgo').replace('{count}', `${diffMinutes}`);
+    const diffHours = Math.round(diffMinutes / 60);
+    if (diffHours < 24) return t('RelativeHoursAgo').replace('{count}', `${diffHours}`);
+    const diffDays = Math.round(diffHours / 24);
+    return t('RelativeDaysAgo').replace('{count}', `${diffDays}`);
+  }, [t]);
 
   return (
     <SafeAreaView edges={["top", "left", "right"]} style={[styles.container, { backgroundColor: colors.background }]}> 
@@ -302,17 +312,6 @@ function StatusRow({ icon, text, tone, colors }: { icon: any; text: string; tone
       <ThemedText style={{ color: colors.textSecondary, fontSize: 13 }}>{text}</ThemedText>
     </View>
   );
-}
-
-function formatRelativeTime(iso: string) {
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const diffMinutes = Math.max(0, Math.round(diffMs / 60000));
-  if (diffMinutes < 1) return 'just now';
-  if (diffMinutes < 60) return `${diffMinutes}m ago`;
-  const diffHours = Math.round(diffMinutes / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
-  const diffDays = Math.round(diffHours / 24);
-  return `${diffDays}d ago`;
 }
 
 const styles = StyleSheet.create({

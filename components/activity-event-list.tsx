@@ -5,6 +5,7 @@ import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ActivityEvent } from '@/contexts/activity-context';
+import { useSettings } from '@/contexts/settings-context';
 import { useTheme } from '@/contexts/theme-context';
 
 export function ActivityEventList({
@@ -21,6 +22,17 @@ export function ActivityEventList({
   subtitle?: string;
 }) {
   const { colors } = useTheme();
+  const { t } = useSettings();
+  const formatRelativeTime = (iso: string) => {
+    const diffMs = Date.now() - new Date(iso).getTime();
+    const diffMinutes = Math.max(0, Math.round(diffMs / 60000));
+    if (diffMinutes < 1) return t('RelativeJustNow');
+    if (diffMinutes < 60) return t('RelativeMinutesAgo').replace('{count}', `${diffMinutes}`);
+    const diffHours = Math.round(diffMinutes / 60);
+    if (diffHours < 24) return t('RelativeHoursAgo').replace('{count}', `${diffHours}`);
+    const diffDays = Math.round(diffHours / 24);
+    return t('RelativeDaysAgo').replace('{count}', `${diffDays}`);
+  };
 
   return (
     <ScrollView contentContainerStyle={styles.content} contentInsetAdjustmentBehavior="never">
@@ -114,17 +126,6 @@ function eventIcon(eventType: ActivityEvent['eventType']) {
     default:
       return 'chart.line.uptrend.xyaxis';
   }
-}
-
-function formatRelativeTime(iso: string) {
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const diffMinutes = Math.max(0, Math.round(diffMs / 60000));
-  if (diffMinutes < 1) return 'just now';
-  if (diffMinutes < 60) return `${diffMinutes}m ago`;
-  const diffHours = Math.round(diffMinutes / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
-  const diffDays = Math.round(diffHours / 24);
-  return `${diffDays}d ago`;
 }
 
 const styles = StyleSheet.create({

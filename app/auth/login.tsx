@@ -6,11 +6,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { useSettings } from '@/contexts/settings-context';
 import { useTheme } from '@/contexts/theme-context';
 import { supabase } from '@/utils/supabase';
 
 export default function LoginScreen() {
   const { colors } = useTheme();
+  const { t } = useSettings();
   const router = useRouter();
   const params = useLocalSearchParams<{ redirectTo?: string }>();
   const confirmPasswordRef = useRef<TextInput>(null);
@@ -44,10 +46,10 @@ export default function LoginScreen() {
   );
   const passwordHintsActive = passwordFocused || password.length > 0;
   const passwordStrengthLabel = passwordStrengthCount <= 1
-    ? 'Weak'
+    ? t('AuthWeak')
     : passwordStrengthCount <= 3
-      ? 'Good'
-      : 'Strong';
+      ? t('AuthGood')
+      : t('AuthStrong');
   const passwordStrengthColor = passwordStrengthCount <= 1
     ? colors.danger
     : passwordStrengthCount <= 3
@@ -92,11 +94,11 @@ export default function LoginScreen() {
 
     const trimmedEmail = email.trim();
     if (!trimmedEmail || !password) {
-      setError('Please enter email and password.');
+      setError(t('AuthEnterEmailPassword'));
       return;
     }
     if (!validateEmail(trimmedEmail)) {
-      setError('Please enter a valid email address.');
+      setError(t('AuthValidEmail'));
       return;
     }
 
@@ -114,7 +116,7 @@ export default function LoginScreen() {
 
       finishAuth();
     } catch {
-      setError('Something went wrong. Please try again.');
+      setError(t('AuthGenericError'));
     } finally {
       setSubmitting(false);
     }
@@ -127,23 +129,23 @@ export default function LoginScreen() {
 
     const trimmedEmail = email.trim();
     if (!trimmedEmail || !password) {
-      setError('Please enter email and password.');
+      setError(t('AuthEnterEmailPassword'));
       return;
     }
     if (!validateEmail(trimmedEmail)) {
-      setError('Please enter a valid email address.');
+      setError(t('AuthValidEmail'));
       return;
     }
     if (!validatePassword(password)) {
-      setError('Use 12+ characters with uppercase, lowercase, and a number.');
+      setError(t('AuthPasswordRulesError'));
       return;
     }
     if (!confirmPassword) {
-      setError('Please confirm your password.');
+      setError(t('AuthConfirmPasswordMissing'));
       return;
     }
     if (password !== confirmPassword) {
-      setError('Passwords do not match.');
+      setError(t('AuthPasswordsMismatch'));
       return;
     }
 
@@ -160,14 +162,14 @@ export default function LoginScreen() {
       }
 
       if (data.session) {
-        setInfo('Account created. Redirecting…');
+        setInfo(t('AuthCreateRedirecting'));
         finishAuth();
         return;
       }
 
-      setInfo('Account created. Check your email if confirmation is required, then sign in.');
+      setInfo(t('AuthCheckEmail'));
     } catch {
-      setError('Something went wrong. Please try again.');
+      setError(t('AuthGenericError'));
     } finally {
       setSubmitting(false);
     }
@@ -181,11 +183,11 @@ export default function LoginScreen() {
 
     const trimmedEmail = email.trim();
     if (!trimmedEmail) {
-      setError('Enter your email address first.');
+      setError(t('AuthEnterEmailFirst'));
       return;
     }
     if (!validateEmail(trimmedEmail)) {
-      setError('Please enter a valid email address.');
+      setError(t('AuthValidEmail'));
       return;
     }
 
@@ -200,9 +202,9 @@ export default function LoginScreen() {
         return;
       }
 
-      setInfo('Password reset email sent. Open the link on this device/browser to continue.');
+      setInfo(t('AuthResetPasswordSent'));
     } catch {
-      setError('Could not send reset email. Please try again.');
+      setError(t('AuthResetPasswordFailed'));
     } finally {
       setResetting(false);
     }
@@ -224,15 +226,15 @@ export default function LoginScreen() {
               <IconSymbol name="xmark" size={18} color={colors.text} />
             </TouchableOpacity>
             <ThemedText type="title" style={[styles.title, { color: colors.text }] }>
-              {authMode === 'signIn' ? 'Sign in' : 'Create account'}
+              {authMode === 'signIn' ? t('AuthModeSignIn') : t('AuthModeCreateAccount')}
             </ThemedText>
           </View>
 
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }] }>
             <View style={[styles.authModeTabs, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
               {([
-                { key: 'signIn', label: 'Sign in' },
-                { key: 'create', label: 'Create account' },
+                { key: 'signIn', label: t('AuthModeSignIn') },
+                { key: 'create', label: t('AuthModeCreateAccount') },
               ] as const).map((mode) => {
                 const active = authMode === mode.key;
                 return (
@@ -262,12 +264,12 @@ export default function LoginScreen() {
 
             <ThemedText style={[styles.modeIntro, { color: colors.textSecondary }]}>
               {authMode === 'signIn'
-                ? 'Use your email and password to access the app.'
-                : 'Create a tester/admin-ready account with a stronger password.'}
+                ? t('AuthUseEmailPassword')
+                : t('AuthCreateTesterAccount')}
             </ThemedText>
 
             <ThemedText style={[styles.label, { color: colors.textSecondary }] }>
-              Email
+              {t('AuthEmail')}
             </ThemedText>
             <View style={[styles.inputRow, { borderColor: colors.border, backgroundColor: colors.surfaceElevated }] }>
               <IconSymbol name="envelope" size={16} color={colors.textTertiary} />
@@ -287,7 +289,7 @@ export default function LoginScreen() {
             </View>
 
             <ThemedText style={[styles.label, { color: colors.textSecondary, marginTop: 16 }] }>
-              Password
+              {t('AuthPassword')}
             </ThemedText>
             <View
               style={[
@@ -312,7 +314,7 @@ export default function LoginScreen() {
                 onChangeText={setPassword}
                 onFocus={() => setPasswordFocused(true)}
                 onBlur={() => setPasswordFocused(false)}
-                placeholder="Your password"
+                placeholder={t('AuthPasswordPlaceholder')}
                 placeholderTextColor={colors.textTertiary}
                 secureTextEntry={!passwordVisible}
                 autoCapitalize="none"
@@ -332,10 +334,10 @@ export default function LoginScreen() {
                 <View style={[styles.passwordHintCard, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
                   <View style={styles.passwordHintHeader}>
                     <ThemedText style={[styles.passwordHintTitle, { color: colors.text }]}>
-                      Password requirements
+                    {t('AuthForNewAccounts')}
                     </ThemedText>
                     <ThemedText style={{ color: passwordHintsActive ? passwordStrengthColor : colors.textTertiary, fontSize: 12, fontWeight: '700' }}>
-                      {passwordHintsActive ? passwordStrengthLabel : 'Start typing'}
+                      {passwordHintsActive ? passwordStrengthLabel : t('AuthStartTyping')}
                     </ThemedText>
                   </View>
 
@@ -357,14 +359,14 @@ export default function LoginScreen() {
                     })}
                   </View>
 
-                  <PasswordRequirement met={passwordChecks.minLength} label="12+ characters" colors={colors} active={passwordHintsActive} />
-                  <PasswordRequirement met={passwordChecks.uppercase} label="Uppercase letter" colors={colors} active={passwordHintsActive} />
-                  <PasswordRequirement met={passwordChecks.lowercase} label="Lowercase letter" colors={colors} active={passwordHintsActive} />
-                  <PasswordRequirement met={passwordChecks.number} label="Number" colors={colors} active={passwordHintsActive} />
+                  <PasswordRequirement met={passwordChecks.minLength} label={t('Auth12Chars')} colors={colors} active={passwordHintsActive} />
+                  <PasswordRequirement met={passwordChecks.uppercase} label={t('AuthUppercase')} colors={colors} active={passwordHintsActive} />
+                  <PasswordRequirement met={passwordChecks.lowercase} label={t('AuthLowercase')} colors={colors} active={passwordHintsActive} />
+                  <PasswordRequirement met={passwordChecks.number} label={t('AuthNumber')} colors={colors} active={passwordHintsActive} />
                 </View>
 
                 <ThemedText style={[styles.label, { color: colors.textSecondary, marginTop: 16 }] }>
-                  Confirm password
+                  {t('AuthConfirmPassword')}
                 </ThemedText>
                 <View
                   style={[
@@ -387,7 +389,7 @@ export default function LoginScreen() {
                     onChangeText={setConfirmPassword}
                     onFocus={() => setConfirmPasswordFocused(true)}
                     onBlur={() => setConfirmPasswordFocused(false)}
-                    placeholder="Repeat password for new accounts"
+                    placeholder={t('AuthConfirmPasswordPlaceholder')}
                     placeholderTextColor={colors.textTertiary}
                     secureTextEntry={!passwordVisible}
                     autoCapitalize="none"
@@ -424,7 +426,7 @@ export default function LoginScreen() {
                             : colors.textTertiary,
                       },
                     ]}>
-                    {passwordsMatch ? 'Passwords match' : 'Repeat your password for account creation'}
+                    {passwordsMatch ? t('AuthPasswordsMatch') : t('AuthRepeatPasswordForCreation')}
                   </ThemedText>
                 </View>
               </>
@@ -445,15 +447,15 @@ export default function LoginScreen() {
             {authMode === 'signIn' ? (
               <TouchableOpacity
                 style={styles.inlineAction}
-                onPress={handleForgotPassword}
-                disabled={resetting || submitting}>
-                <ThemedText style={{ color: colors.primary, fontSize: 13, fontWeight: '600' }}>
-                  {resetting ? 'Sending reset email…' : 'Forgot password?'}
-                </ThemedText>
-              </TouchableOpacity>
+              onPress={handleForgotPassword}
+              disabled={resetting || submitting}>
+              <ThemedText style={{ color: colors.primary, fontSize: 13, fontWeight: '600' }}>
+                  {resetting ? t('AuthSendingResetEmail') : t('AuthForgotPassword')}
+              </ThemedText>
+            </TouchableOpacity>
             ) : (
               <ThemedText style={[styles.createModeNote, { color: colors.textSecondary }]}>
-                If email confirmation is enabled, you’ll verify the account before signing in.
+                {t('AuthEmailConfirmationNote')}
               </ThemedText>
             )}
 
@@ -470,7 +472,7 @@ export default function LoginScreen() {
                     styles.primaryButtonText,
                     { color: disabled ? colors.textSecondary : colors.primaryText },
                   ]}>
-                  {authMode === 'signIn' ? 'Continue' : 'Create account'}
+                  {authMode === 'signIn' ? t('AuthContinue') : t('AuthCreateAccountAction')}
                 </ThemedText>
               )}
             </TouchableOpacity>
@@ -480,7 +482,7 @@ export default function LoginScreen() {
               disabled={submitting}
               onPress={() => switchMode(authMode === 'signIn' ? 'create' : 'signIn')}>
               <ThemedText style={[styles.secondaryButtonText, { color: colors.text }] }>
-                {authMode === 'signIn' ? 'Create account instead' : 'Back to sign in'}
+                {authMode === 'signIn' ? t('AuthCreateAccountInstead') : t('AuthBackToSignIn')}
               </ThemedText>
             </TouchableOpacity>
           </View>

@@ -4,6 +4,7 @@ import { RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from '
 
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { useSettings } from '@/contexts/settings-context';
 import { useTheme } from '@/contexts/theme-context';
 import { useWatchlist } from '@/contexts/watchlist-context';
 import { supabase } from '@/utils/supabase';
@@ -18,14 +19,15 @@ type SavedCoinRow = {
 
 export function SavedCoinsContent({
   showHeader = true,
-  title = 'Saved coins',
-  subtitle = 'Your watchlist is stored on this device for now.',
+  title,
+  subtitle,
 }: {
   showHeader?: boolean;
   title?: string;
   subtitle?: string;
 }) {
   const { colors } = useTheme();
+  const { t } = useSettings();
   const { symbols, loading: watchlistLoading, mode, syncState, toggleSaved, reload } = useWatchlist();
   const [rows, setRows] = useState<SavedCoinRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -90,12 +92,13 @@ export function SavedCoinsContent({
     value == null ? '--' : `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`;
 
   const empty = !watchlistLoading && !orderedSymbols.length;
+  const resolvedTitle = title ?? t('SavedCoinsTitle');
   const resolvedSubtitle =
     mode === 'account'
       ? syncState === 'error'
-        ? 'Saved coins are cached locally and will retry syncing to your account.'
-        : 'Saved coins are synced to your account and cached on this device.'
-      : subtitle;
+        ? t('SavedCoinsSubtitleRetry')
+        : t('SavedCoinsSubtitleAccount')
+      : (subtitle ?? t('SavedCoinsSubtitleDevice'));
 
   return (
     <ScrollView
@@ -115,7 +118,7 @@ export function SavedCoinsContent({
       {showHeader && (
         <View style={styles.header}>
           <ThemedText type="title" style={{ color: colors.text }}>
-            {title}
+            {resolvedTitle}
           </ThemedText>
           <ThemedText style={[styles.subtitle, { color: colors.textSecondary }]}>
             {resolvedSubtitle}
@@ -125,15 +128,15 @@ export function SavedCoinsContent({
 
       <View style={[styles.summaryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <View>
-          <ThemedText style={{ color: colors.textSecondary, fontSize: 12 }}>Tracked now</ThemedText>
+          <ThemedText style={{ color: colors.textSecondary, fontSize: 12 }}>{t('TrackedNow')}</ThemedText>
           <ThemedText style={{ color: colors.text, fontSize: 28, fontWeight: '700', marginTop: 4 }}>
             {orderedSymbols.length}
           </ThemedText>
         </View>
         <View style={styles.summaryRight}>
-          <ThemedText style={{ color: colors.textSecondary, fontSize: 12 }}>Next step</ThemedText>
+          <ThemedText style={{ color: colors.textSecondary, fontSize: 12 }}>{t('NextStep')}</ThemedText>
           <ThemedText style={{ color: colors.text, fontSize: 14, fontWeight: '600', marginTop: 4 }}>
-            Tap any coin for details
+            {t('TapAnyCoinForDetails')}
           </ThemedText>
         </View>
       </View>
@@ -142,17 +145,17 @@ export function SavedCoinsContent({
         <View style={[styles.emptyCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <IconSymbol name="bookmark" size={28} color={colors.textTertiary} />
           <ThemedText type="subtitle" style={{ color: colors.text, fontSize: 18 }}>
-            No saved coins yet
+            {t('NoSavedCoinsYet')}
           </ThemedText>
           <ThemedText style={[styles.emptyBody, { color: colors.textSecondary }]}>
-            Save coins from Explore or the coin detail screen and they will appear here.
+            {t('SaveCoinsFromExplore')}
           </ThemedText>
           <TouchableOpacity
             style={[styles.primaryButton, { backgroundColor: colors.primary }]}
             onPress={() => router.push('/explore')}
           >
             <ThemedText style={{ color: colors.primaryText, fontWeight: '700' }}>
-              Go to Explore
+              {t('GoToExplore')}
             </ThemedText>
           </TouchableOpacity>
         </View>
@@ -161,7 +164,7 @@ export function SavedCoinsContent({
       {error ? (
         <View style={[styles.infoCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <ThemedText style={{ color: colors.danger, fontWeight: '600' }}>
-            Failed to load live prices
+            {t('FailedToLoadLivePrices')}
           </ThemedText>
           <ThemedText style={{ color: colors.textSecondary, marginTop: 4 }}>{error}</ThemedText>
         </View>
@@ -215,10 +218,10 @@ export function SavedCoinsContent({
       {!empty && !rows.length && !loading && !error ? (
         <View style={[styles.infoCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <ThemedText style={{ color: colors.text, fontWeight: '600' }}>
-            Saved symbols are ready
+            {t('SavedSymbolsReady')}
           </ThemedText>
           <ThemedText style={{ color: colors.textSecondary, marginTop: 4 }}>
-            Live market rows will appear here after the next ingest run populates Supabase data.
+            {t('SavedSymbolsReadyBody')}
           </ThemedText>
         </View>
       ) : null}

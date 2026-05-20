@@ -152,33 +152,33 @@ export default function ExploreScreen() {
     const volume = [...rows]
       .sort((a, b) => (b.vol24 ?? 0) - (a.vol24 ?? 0))
       .slice(0, 10)
-      .map((row) => mapRow(row, '24H vol', formatCompactDollars(row.vol24)));
+      .map((row) => mapRow(row, t('Vol24Label'), formatCompactDollars(row.vol24)));
 
     const gainers = [...rows]
       .filter((r) => (r.changeNum ?? 0) > 0)
       .sort((a, b) => (b.changeNum ?? 0) - (a.changeNum ?? 0))
       .slice(0, 10)
-      .map((row) => mapRow(row, '24H vol', formatCompactDollars(row.vol24)));
+      .map((row) => mapRow(row, t('Vol24Label'), formatCompactDollars(row.vol24)));
 
     const losers = [...rows]
       .filter((r) => (r.changeNum ?? 0) < 0)
       .sort((a, b) => (a.changeNum ?? 0) - (b.changeNum ?? 0))
       .slice(0, 10)
-      .map((row) => mapRow(row, '24H vol', formatCompactDollars(row.vol24)));
+      .map((row) => mapRow(row, t('Vol24Label'), formatCompactDollars(row.vol24)));
 
     const popular = [...rows]
       .sort((a, b) => a.rankNum - b.rankNum)
       .slice(0, 10)
-      .map((row) => mapRow(row, 'Market rank', `#${row.rankNum}`));
+      .map((row) => mapRow(row, t('MarketRankLabel'), `#${row.rankNum}`));
 
     // For now, use volume as a proxy for trades list.
     const trades = [...rows]
       .sort((a, b) => (b.vol24 ?? 0) - (a.vol24 ?? 0))
       .slice(0, 10)
-      .map((row) => mapRow(row, 'Vol proxy', formatCompactDollars(row.vol24)));
+      .map((row) => mapRow(row, t('VolProxy'), formatCompactDollars(row.vol24)));
 
     return { volume, trades, gainers, losers, popular };
-  }, [coinsData]);
+  }, [coinsData, t]);
 
   return (
     <SafeAreaView edges={["top","left","right"]} style={[styles.container, { backgroundColor: colors.background }]}>
@@ -217,10 +217,10 @@ export default function ExploreScreen() {
           </View>
         </View>
 
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <ThemedText type="subtitle" style={[styles.sectionTitle, { color: colors.text }]}>{t('LiveStocks')}</ThemedText>
-          </View>
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <ThemedText type="subtitle" style={[styles.sectionTitle, { color: colors.text }]}>{t('LiveStocks')}</ThemedText>
+        </View>
           <View style={styles.inlineTabsRow}>
             {([
               { key: 'volume', label: t('Volume') },
@@ -239,15 +239,15 @@ export default function ExploreScreen() {
             <View style={styles.liveBoardHeader}>
               <View>
                 <ThemedText style={{ color: colors.text, fontWeight: '700' }}>
-                  Live market board
+                  {t('LiveMarketBoardTitle')}
                 </ThemedText>
                 <ThemedText style={{ color: colors.textSecondary, fontSize: 12, marginTop: 2 }}>
-                  Tap any coin for details.
+                  {t('TapAnyCoinDetails')}
                 </ThemedText>
               </View>
               <View style={[styles.liveBadge, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
                 <ThemedText style={{ color: colors.success, fontSize: 11, fontWeight: '700' }}>
-                  LIVE
+                  {t('LiveBadge')}
                 </ThemedText>
               </View>
             </View>

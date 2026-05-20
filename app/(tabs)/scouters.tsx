@@ -269,25 +269,25 @@ export default function ScoutersScreen() {
         )}
       >
         <View style={[styles.infoCard, { backgroundColor: colors.surface, borderColor: colors.border }]}> 
-          <ThemedText style={{ color: colors.text, fontWeight: '700' }}>Live presets, not fake scanners</ThemedText>
+          <ThemedText style={{ color: colors.text, fontWeight: '700' }}>{t('LivePresetsTitle')}</ThemedText>
           <ThemedText style={{ color: colors.textSecondary, marginTop: 6, lineHeight: 20 }}>
-            Scouters now derive matches from live Supabase market snapshots. Custom saved scanners will come after dedicated backend tables land.
+            {t('LivePresetsBody')}
           </ThemedText>
           <ThemedText style={{ color: colors.textTertiary, marginTop: 10, fontSize: 12 }}>
-            Last market update: {lastUpdated ? new Date(lastUpdated).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+            {t('LastMarketUpdate')}: {lastUpdated ? new Date(lastUpdated).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}
           </ThemedText>
         </View>
 
         {loading ? (
           <View style={styles.centerState}>
             <ActivityIndicator color={colors.primary} />
-            <ThemedText style={{ color: colors.textSecondary, marginTop: 12 }}>Loading live scouters…</ThemedText>
+            <ThemedText style={{ color: colors.textSecondary, marginTop: 12 }}>{t('LoadingLiveScouters')}</ThemedText>
           </View>
         ) : null}
 
         {!loading && error ? (
           <View style={[styles.infoCard, { backgroundColor: colors.surface, borderColor: colors.border }]}> 
-            <ThemedText style={{ color: colors.danger, fontWeight: '700' }}>Could not load scouters</ThemedText>
+            <ThemedText style={{ color: colors.danger, fontWeight: '700' }}>{t('CouldNotLoadScouters')}</ThemedText>
             <ThemedText style={{ color: colors.textSecondary, marginTop: 6 }}>{error}</ThemedText>
           </View>
         ) : null}
@@ -322,7 +322,7 @@ export default function ScoutersScreen() {
                   </TouchableOpacity>
                 )) : (
                   <View style={[styles.emptyInlineCard, { backgroundColor: colors.surface, borderColor: colors.border }]}> 
-                    <ThemedText style={{ color: colors.textSecondary }}>No live matches yet. Pull to refresh after ingest runs.</ThemedText>
+                    <ThemedText style={{ color: colors.textSecondary }}>{t('NoLiveMatchesYet')}</ThemedText>
                   </View>
                 )}
               </ScrollView>
@@ -330,7 +330,7 @@ export default function ScoutersScreen() {
 
             <TouchableOpacity style={[styles.createButton, { backgroundColor: colors.primary, borderColor: colors.primary }]} onPress={onRefresh}>
               <IconSymbol name="arrow.clockwise" size={20} color={colors.primaryText} />
-              <ThemedText style={[styles.createButtonText, { color: colors.primaryText }]}>Refresh live scanners</ThemedText>
+              <ThemedText style={[styles.createButtonText, { color: colors.primaryText }]}>{t('RefreshLiveScanners')}</ThemedText>
             </TouchableOpacity>
 
             <View style={styles.section}>
@@ -379,7 +379,7 @@ export default function ScoutersScreen() {
                       </TouchableOpacity>
                       <TouchableOpacity style={[styles.actionButton, { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 }]} onPress={() => handleViewScouter(scouter.id)}>
                         <IconSymbol name="eye.fill" size={13} color={colors.text} />
-                        <ThemedText style={{ color: colors.text, fontSize: 12, fontWeight: '600' }}>View matches</ThemedText>
+                        <ThemedText style={{ color: colors.text, fontSize: 12, fontWeight: '600' }}>{t('ViewMatches')}</ThemedText>
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -391,7 +391,7 @@ export default function ScoutersScreen() {
               <View ref={matchesSectionRef as any} style={styles.section}>
                 <View style={styles.sectionHeader}>
                   <ThemedText type="subtitle" style={[styles.sectionTitle, { color: colors.text }]}> 
-                    Live matches · {selectedScouter.name}
+                    {t('LiveMatchesFor').replace('{name}', selectedScouter.name)}
                   </ThemedText>
                 </View>
                 {selectedScouter.matches.length ? selectedScouter.matches.map((match) => {
@@ -428,7 +428,7 @@ export default function ScoutersScreen() {
                 }) : (
                   <View style={[styles.infoCard, { backgroundColor: colors.surface, borderColor: colors.border }]}> 
                     <ThemedText style={{ color: colors.textSecondary }}>
-                      No matches currently satisfy this preset. Pull to refresh after the next market ingest run.
+                      {t('NoScouterMatchesBody')}
                     </ThemedText>
                   </View>
                 )}

@@ -45,15 +45,15 @@ export default function MenuScreen() {
     loadStatus().finally(() => setRefreshing(false));
   }, [loadStatus]);
 
-  const accountSubtitle = user?.email || 'Sign in to sync settings and saved items later';
+  const accountSubtitle = user?.email || t('SignInSyncLater');
   const pushLogin = (redirectTo: string) =>
     router.push({ pathname: '/auth/login', params: { redirectTo } } as any);
   const showAdminPanel = Boolean(user);
   const feedStatusLabel = useMemo(() => {
-    if (feedStatus === 'live') return 'Live';
-    if (feedStatus === 'error') return 'Offline';
-    return 'Waiting for ingest';
-  }, [feedStatus]);
+    if (feedStatus === 'live') return t('LiveStatus');
+    if (feedStatus === 'error') return t('OfflineStatus');
+    return t('WaitingForIngest');
+  }, [feedStatus, t]);
 
   return (
     <SafeAreaView edges={["top", "left", "right"]} style={[styles.container, { backgroundColor: colors.background }]}> 
@@ -73,8 +73,8 @@ export default function MenuScreen() {
         )}
       >
         <View style={styles.header}>
-          <ThemedText type="title" style={{ color: colors.text }}>Menu</ThemedText>
-          <ThemedText style={[styles.subtitle, { color: colors.textSecondary }]}>Account, app status, settings, and support.</ThemedText>
+          <ThemedText type="title" style={{ color: colors.text }}>{t('Menu')}</ThemedText>
+          <ThemedText style={[styles.subtitle, { color: colors.textSecondary }]}>{t('MenuSubtitle')}</ThemedText>
         </View>
 
         <View style={[styles.accountCard, { backgroundColor: colors.surface, borderColor: colors.border }]}> 
@@ -96,7 +96,7 @@ export default function MenuScreen() {
                 </ThemedText>
                 <View style={[styles.pill, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}> 
                   <ThemedText style={{ color: colors.textSecondary, fontSize: 11, fontWeight: '700' }}>
-                    {user ? 'Signed in' : 'Guest'}
+                    {user ? t('SignedIn') : t('Guest')}
                   </ThemedText>
                 </View>
               </View>
@@ -110,41 +110,41 @@ export default function MenuScreen() {
           {!user ? (
             <TouchableOpacity style={[styles.primaryButton, { backgroundColor: colors.primary }]} onPress={() => pushLogin('/menu')}>
               <IconSymbol name="person.crop.circle.badge.plus" size={16} color={colors.primaryText} />
-              <ThemedText style={{ color: colors.primaryText, fontWeight: '700' }}>Sign in / Register</ThemedText>
+              <ThemedText style={{ color: colors.primaryText, fontWeight: '700' }}>{t('SignInRegister')}</ThemedText>
             </TouchableOpacity>
           ) : (
             <TouchableOpacity style={[styles.secondaryButton, { borderColor: colors.border }]} onPress={signOut}>
               <IconSymbol name="rectangle.portrait.and.arrow.right" size={16} color={colors.textSecondary} />
-              <ThemedText style={{ color: colors.textSecondary, fontWeight: '600' }}>Logout</ThemedText>
+              <ThemedText style={{ color: colors.textSecondary, fontWeight: '600' }}>{t('Logout')}</ThemedText>
             </TouchableOpacity>
           )}
         </View>
 
         <View style={styles.statsGrid}>
           <StatCard
-            label={mode === 'account' ? 'Saved sync' : 'Saved local'}
+            label={mode === 'account' ? t('SavedSyncLabel') : t('SavedLocalLabel')}
             value={`${symbols.length}`}
             detail={
               mode === 'account'
                 ? syncState === 'error'
-                  ? 'needs retry'
-                  : 'account watchlist'
-                : 'guest device list'
+                  ? t('NeedsRetry')
+                  : t('AccountWatchlist')
+                : t('GuestDeviceList')
             }
             colors={colors}
           />
-          <StatCard label="Market feed" value={`${marketCount}`} detail="tracked coins" colors={colors} />
-          <StatCard label="Status" value={feedStatusLabel} detail={lastUpdated ? formatRelativeTime(lastUpdated) : 'No timestamp'} colors={colors} />
-          <StatCard label="Sync" value={user ? 'Account' : 'Local'} detail={user ? 'Auth session ready' : 'Device-only mode'} colors={colors} />
+          <StatCard label={t('MarketFeed')} value={`${marketCount}`} detail={t('TrackedCoinsCount')} colors={colors} />
+          <StatCard label={t('StatusLabel')} value={feedStatusLabel} detail={lastUpdated ? formatRelativeTime(lastUpdated) : t('NoTimestamp')} colors={colors} />
+          <StatCard label={t('SyncLabel')} value={user ? t('AccountMode') : t('LocalMode')} detail={user ? t('AuthSessionReady') : t('DeviceOnlyMode')} colors={colors} />
         </View>
 
         <View style={[styles.infoCard, { backgroundColor: colors.surface, borderColor: colors.border }]}> 
-          <ThemedText style={{ color: colors.text, fontWeight: '700' }}>Product status</ThemedText>
+          <ThemedText style={{ color: colors.text, fontWeight: '700' }}>{t('ProductStatus')}</ThemedText>
           <View style={styles.statusList}>
-            <StatusRow icon="checkmark.circle.fill" text="Auth flow is live" tone={colors.success} colors={colors} />
-            <StatusRow icon="checkmark.circle.fill" text="Market feed is powered by Supabase" tone={colors.success} colors={colors} />
-            <StatusRow icon="bookmark.fill" text="Saved coins are local-only for now" tone={colors.primary} colors={colors} />
-            <StatusRow icon="scope" text="Scouters use live presets; custom scanners come next" tone={colors.text} colors={colors} />
+            <StatusRow icon="checkmark.circle.fill" text={t('AuthFlowLive')} tone={colors.success} colors={colors} />
+            <StatusRow icon="checkmark.circle.fill" text={t('MarketFeedPowered')} tone={colors.success} colors={colors} />
+            <StatusRow icon="bookmark.fill" text={t('SavedCoinsLocalOnly')} tone={colors.primary} colors={colors} />
+            <StatusRow icon="scope" text={t('ScoutersPresetsLive')} tone={colors.text} colors={colors} />
           </View>
         </View>
 
@@ -167,19 +167,19 @@ export default function MenuScreen() {
           />
         </Section>
 
-        <Section title="Explore & track" icon="chart.line.uptrend.xyaxis" colors={colors}>
-          <MenuRow icon="saturn" label="Explore live market board" onPress={() => router.push('/explore')} colors={colors} divider colorsObj={colors} />
+        <Section title={t('ExploreTrack')} icon="chart.line.uptrend.xyaxis" colors={colors}>
+          <MenuRow icon="saturn" label={t('ExploreLiveMarketBoard')} onPress={() => router.push('/explore')} colors={colors} divider colorsObj={colors} />
           <MenuRow icon="bookmark.fill" label={t('Saved')} onPress={() => router.push('/activity/saved')} colors={colors} divider colorsObj={colors} />
           <MenuRow icon="list.bullet.rectangle" label={t('Watchlists')} onPress={() => router.push('/watchlists')} colors={colors} divider colorsObj={colors} />
           <MenuRow icon="scope" label={t('Scouters')} onPress={() => router.push('/scouters')} colors={colors} divider colorsObj={colors} />
-          <MenuRow icon="list.number" label="Top 100 rankings" onPress={() => router.push('/explore/top100')} colors={colors} />
+          <MenuRow icon="list.number" label={t('Top100Rankings')} onPress={() => router.push('/explore/top100')} colors={colors} />
         </Section>
 
         {showAdminPanel ? (
-          <Section title="Admin" icon="lock.shield.fill" colors={colors}>
+          <Section title={t('Admin')} icon="lock.shield.fill" colors={colors}>
             <MenuRow
               icon="waveform.path.ecg.rectangle"
-              label="Admin panel"
+              label={t('AdminPanel')}
               onPress={() => router.push('/admin' as any)}
               colors={colors}
             />
@@ -228,7 +228,7 @@ export default function MenuScreen() {
 
         <View style={{ alignItems: 'center', paddingVertical: 20 }}>
           <ThemedText style={{ color: colors.textTertiary, fontSize: 12 }}>yoink v1.0.0</ThemedText>
-          <ThemedText style={{ color: colors.textTertiary, fontSize: 11, marginTop: 4 }}>Crypto intelligence. Signal first.</ThemedText>
+          <ThemedText style={{ color: colors.textTertiary, fontSize: 11, marginTop: 4 }}>{t('AppTagline')}</ThemedText>
         </View>
       </ScrollView>
     </SafeAreaView>

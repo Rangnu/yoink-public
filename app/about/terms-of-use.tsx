@@ -1,17 +1,26 @@
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useTheme } from '@/contexts/theme-context';
-import { ThemedText } from '@/components/themed-text';
-import { View } from 'react-native';
+
+import { PlaceholderScreen } from '@/components/ui/placeholder-screen';
 import { useSettings } from '@/contexts/settings-context';
+import { useTheme } from '@/contexts/theme-context';
 
 export default function TermsOfUseScreen() {
   const { colors } = useTheme();
   const { t } = useSettings();
   return (
     <SafeAreaView edges={["top","left","right"]} style={{ flex: 1, backgroundColor: colors.background }}>
-      <View style={{ paddingHorizontal: 16, paddingTop: 0, paddingBottom: 16 }}>
-        <ThemedText style={{ color: colors.textSecondary }}>{t('TermsOfUse')}</ThemedText>
-      </View>
+      <PlaceholderScreen
+        icon="doc.text"
+        eyebrow="Legal"
+        title="Terms of use"
+        description="A fuller terms document will live here as the product moves beyond the current tester-focused phase."
+        bullets={[
+          'Usage rules for app data, signals, and alerts',
+          'Tester/admin responsibilities for internal environments',
+          'Future subscription and account terms',
+        ]}
+        note={t('TermsOfUse')}
+      />
     </SafeAreaView>
   );
 }

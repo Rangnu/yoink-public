@@ -1,17 +1,26 @@
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useTheme } from '@/contexts/theme-context';
-import { ThemedText } from '@/components/themed-text';
-import { View } from 'react-native';
+
+import { PlaceholderScreen } from '@/components/ui/placeholder-screen';
 import { useSettings } from '@/contexts/settings-context';
+import { useTheme } from '@/contexts/theme-context';
 
 export default function PrivacyPolicyScreen() {
   const { colors } = useTheme();
   const { t } = useSettings();
   return (
     <SafeAreaView edges={["top","left","right"]} style={{ flex: 1, backgroundColor: colors.background }}>
-      <View style={{ paddingHorizontal: 16, paddingTop: 0, paddingBottom: 16 }}>
-        <ThemedText style={{ color: colors.textSecondary }}>{t('PrivacyPolicy')}</ThemedText>
-      </View>
+      <PlaceholderScreen
+        icon="lock.fill"
+        eyebrow="Legal"
+        title="Privacy policy"
+        description="A fuller privacy policy document will live here before broader public rollout."
+        bullets={[
+          'What market data and account data Yoink stores',
+          'What remains device-local vs synced to Supabase',
+          'How tester/admin access is controlled and audited',
+        ]}
+        note={t('PrivacyPolicy')}
+      />
     </SafeAreaView>
   );
 }

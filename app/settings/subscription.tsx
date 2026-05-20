@@ -1,17 +1,25 @@
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useTheme } from '@/contexts/theme-context';
-import { ThemedText } from '@/components/themed-text';
-import { View } from 'react-native';
+
+import { PlaceholderScreen } from '@/components/ui/placeholder-screen';
 import { useSettings } from '@/contexts/settings-context';
+import { useTheme } from '@/contexts/theme-context';
 
 export default function SubscriptionScreen() {
   const { colors } = useTheme();
   const { t } = useSettings();
   return (
     <SafeAreaView edges={["top","left","right"]} style={{ flex: 1, backgroundColor: colors.background }}>
-      <View style={{ paddingHorizontal: 16, paddingTop: 0, paddingBottom: 16 }}>
-        <ThemedText style={{ color: colors.textSecondary }}>{t('SubscriptionDescription')}</ThemedText>
-      </View>
+      <PlaceholderScreen
+        icon="creditcard"
+        eyebrow="Subscription"
+        title="Subscription plans"
+        description={t('SubscriptionDescription')}
+        bullets={[
+          'Future access to richer charting and advanced monitoring',
+          'Expanded alerts, layouts, and premium signal surfaces',
+          'Account-level billing and plan management',
+        ]}
+      />
     </SafeAreaView>
   );
 }

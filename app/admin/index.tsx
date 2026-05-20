@@ -19,6 +19,7 @@ type AdminStatusPayload = {
   };
   admin: {
     allowlistConfigured: boolean;
+    allowlistSource: 'table' | 'secret';
   };
   ingest: {
     runCount: number;
@@ -372,6 +373,7 @@ export default function AdminScreen() {
             <InfoRow label="Client allowlist configured" value={clientAdminConfigured ? 'yes' : 'no'} colors={colors} />
             <InfoRow label="Client fallback allowed" value={clientAdminAllowed ? 'yes' : 'no'} colors={colors} />
             <InfoRow label="Privileged source" value={privilegedStatus === 'edge' ? 'admin-status function' : 'public fallback'} valueColor={privilegedStatus === 'edge' ? colors.success : '#FFB020'} colors={colors} />
+            <InfoRow label="Backend allowlist source" value={edgeStatus ? edgeStatus.admin.allowlistSource : '--'} colors={colors} />
             <InfoRow
               label="Function deploy state"
               value={accessMode === 'edge' ? 'available' : accessMode === 'fallback' ? 'unavailable / fallback' : 'unknown'}
@@ -474,6 +476,14 @@ export default function AdminScreen() {
               text={privilegedStatus === 'edge'
                 ? 'Privileged ops view is active through the protected admin function.'
                 : 'Current ops view is still on public fallback data until the admin function is deployed.'}
+              colors={colors}
+            />
+            <StatusRow
+              icon="lock.shield.fill"
+              tone={colors.text}
+              text={edgeStatus
+                ? `Backend admin access is currently resolved via ${edgeStatus.admin.allowlistSource}.`
+                : 'Backend admin access can be resolved by either the admin_allowlist table or the ADMIN_EMAILS secret.'}
               colors={colors}
             />
             <StatusRow

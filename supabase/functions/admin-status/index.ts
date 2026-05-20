@@ -9,6 +9,10 @@ type IngestRunRow = {
   error: string | null;
 };
 
+type AllowlistResolution =
+  | { allowed: true; source: 'table' | 'secret' }
+  | { allowed: false; source: 'table' | 'secret' | 'missing'; code: string; error: string };
+
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? Deno.env.get('SUPABASE_PUBLISHABLE_KEY') ?? '';
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
@@ -27,6 +31,59 @@ function json(body: unknown, status = 200) {
 function isAllowedAdmin(email?: string | null) {
   if (!email) return false;
   return ADMIN_EMAILS.includes(email.trim().toLowerCase());
+}
+
+async function resolveAdminAccess(adminClient, email) {
+  const normalizedEmail = (email ?? '').trim().toLowerCase();
+
+  const { data: allowlistRow, error: allowlistError } = await adminClient
+    .from('admin_allowlist')
+    .select('email, active')
+    .eq('email', normalizedEmail)
+    .eq('active', true)
+    .maybeSingle();
+
+  if (!allowlistError) {
+    if (allowlistRow?.email) {
+      return { allowed: true, source: 'table' };
+    }
+
+    return {
+      allowed: false,
+      source: 'table',
+      code: 'admin_access_denied',
+      error: 'Admin access denied.',
+    };
+  }
+
+  if (allowlistError.code !== 'PGRST205' && allowlistError.code !== '42P01') {
+    return {
+      allowed: false,
+      source: 'missing',
+      code: 'admin_query_failed',
+      error: allowlistError.message,
+    };
+  }
+
+  if (ADMIN_EMAILS.length === 0) {
+    return {
+      allowed: false,
+      source: 'missing',
+      code: 'admin_allowlist_missing',
+      error: 'Admin allowlist is not configured on the backend.',
+    };
+  }
+
+  if (isAllowedAdmin(normalizedEmail)) {
+    return { allowed: true, source: 'secret' };
+  }
+
+  return {
+    allowed: false,
+    source: 'secret',
+    code: 'admin_access_denied',
+    error: 'Admin access denied.',
+  };
 }
 
 Deno.serve(async (req: Request) => {
@@ -58,15 +115,12 @@ Deno.serve(async (req: Request) => {
       return json({ error: userError?.message ?? 'Unable to resolve user.', code: 'admin_auth_invalid' }, 401);
     }
 
-    if (ADMIN_EMAILS.length === 0) {
-      return json({ error: 'Admin allowlist is not configured on the backend.', code: 'admin_allowlist_missing' }, 503);
-    }
-
-    if (!isAllowedAdmin(user.email)) {
-      return json({ error: 'Admin access denied.', code: 'admin_access_denied' }, 403);
-    }
-
     const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    const allowlist = await resolveAdminAccess(adminClient, user.email);
+
+    if (!allowlist.allowed) {
+      return json({ error: allowlist.error, code: allowlist.code }, allowlist.code === 'admin_allowlist_missing' ? 503 : allowlist.code === 'admin_query_failed' ? 500 : 403);
+    }
 
     const [
       { count: coinsCount, error: coinsError },
@@ -131,7 +185,8 @@ Deno.serve(async (req: Request) => {
       },
       source: 'edge-function',
       admin: {
-        allowlistConfigured: ADMIN_EMAILS.length > 0,
+        allowlistConfigured: allowlist.source !== 'missing',
+        allowlistSource: allowlist.source,
       },
       ingest: {
         runCount: runs.length,

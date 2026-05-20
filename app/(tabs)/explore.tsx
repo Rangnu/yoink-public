@@ -1,5 +1,4 @@
 import { ThemedText } from '@/components/themed-text';
-import { BitcoinIcon } from '@/components/ui/bitcoin-icon';
 import { CoinSparkline } from '@/components/ui/coin-sparkline';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useSettings } from '@/contexts/settings-context';
@@ -207,16 +206,6 @@ export default function ExploreScreen() {
           />
         )}
       >
-        <View style={styles.section}>
-          <View style={styles.categoriesRow}>
-            <CategoryButton
-              colors={colors}
-              label={t('Coins')}
-              renderIcon={() => (<BitcoinIcon size={24} color="#F5C518" />)}
-            />
-          </View>
-        </View>
-
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <ThemedText type="subtitle" style={[styles.sectionTitle, { color: colors.text }]}>{t('LiveStocks')}</ThemedText>
@@ -293,21 +282,6 @@ export default function ExploreScreen() {
         </View>
       </ScrollView>
     </SafeAreaView>
-  );
-}
-
-function CategoryButton({ colors, emoji, icon, label, renderIcon }: { colors: any; emoji?: string; icon?: any; label: string; renderIcon?: () => React.ReactNode }) {
-  return (
-    <TouchableOpacity style={[styles.categoryBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}> 
-      {renderIcon ? (
-        renderIcon()
-      ) : emoji ? (
-        <ThemedText style={{ fontSize: 20 }}>{emoji}</ThemedText>
-      ) : (
-        <IconSymbol name={icon as any} size={20} color={colors.text} />
-      )}
-      <ThemedText style={{ color: colors.text, fontSize: 12, fontWeight: '600' }}>{label}</ThemedText>
-    </TouchableOpacity>
   );
 }
 
@@ -491,8 +465,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginTop: 8,
   },
-  categoriesRow: { flexDirection: 'row', gap: 10 },
-  categoryBtn: { flex: 1, borderWidth: 1, borderRadius: 12, paddingVertical: 14, alignItems: 'center', gap: 8 },
   tabsRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   miniTab: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 999, borderWidth: 1 },
   inlineTabsRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 14, paddingTop: 6, paddingBottom: 6 },

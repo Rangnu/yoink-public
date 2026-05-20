@@ -133,6 +133,7 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
   const [pickerBusy, setPickerBusy] = useState(false);
   const [pickerError, setPickerError] = useState<string | null>(null);
   const [pickerDraftName, setPickerDraftName] = useState('');
+  const [pickerCreateMode, setPickerCreateMode] = useState(false);
   const symbolsRef = useRef<string[]>([]);
   const watchlistsRef = useRef<WatchlistSummary[]>(buildLocalWatchlists([]));
 
@@ -352,6 +353,7 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
     setPickerError(null);
     setPickerDraftName('');
     setPickerBusy(false);
+    setPickerCreateMode(false);
   }, [user]);
 
   const setDefaultWatchlist = useCallback(async (watchlistId: string) => {
@@ -609,6 +611,7 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
     setPickerSymbol(normalized);
     setPickerError(null);
     setPickerDraftName('');
+    setPickerCreateMode(false);
   }, [user]);
 
   const closeSavePicker = useCallback(() => {
@@ -616,6 +619,7 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
     setPickerBusy(false);
     setPickerError(null);
     setPickerDraftName('');
+    setPickerCreateMode(false);
   }, []);
 
   const toggleSaved = useCallback(async (symbol: string) => {
@@ -755,77 +759,100 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
         <View style={[styles.sheet, { backgroundColor: colors.surface }]}> 
           <View style={[styles.sheetHandle, { backgroundColor: colors.border }]} />
           <ThemedText type="defaultSemiBold" style={{ color: colors.text, fontSize: 18 }}>
-            Save {pickerSymbol ? `${pickerSymbol}` : 'coin'}
-          </ThemedText>
-          <ThemedText style={{ color: colors.textSecondary, marginTop: 6, lineHeight: 20 }}>
-            Choose one or more watchlists. A coin can belong to multiple lists.
+            Save to...
           </ThemedText>
 
           <View style={styles.sheetList}>
             {watchlists.map((watchlist) => {
               const selected = pickerSymbol ? isSaved(pickerSymbol, watchlist.id) : false;
+              const initials = watchlist.name.slice(0, 2).toUpperCase();
+              const subtitle = watchlist.isDefault
+                ? 'Private · Default'
+                : `Private · ${watchlist.symbols.length} coin${watchlist.symbols.length === 1 ? '' : 's'}`;
               return (
                 <TouchableOpacity
                   key={watchlist.id}
-                  style={[styles.sheetRow, { borderColor: colors.border, backgroundColor: colors.surfaceElevated }]}
+                  style={[styles.sheetRow, { borderColor: colors.border }]}
                   onPress={() => handlePickerToggleWatchlist(watchlist.id)}
                   disabled={pickerBusy}
                 >
+                  <View style={[styles.sheetThumb, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
+                    <ThemedText style={{ color: colors.text, fontSize: 12, fontWeight: '800' }}>
+                      {initials}
+                    </ThemedText>
+                  </View>
                   <View style={{ flex: 1 }}>
-                    <View style={styles.sheetRowTitle}>
-                      <ThemedText style={{ color: colors.text, fontWeight: '700' }}>{watchlist.name}</ThemedText>
-                      {watchlist.isDefault ? (
-                        <View style={[styles.defaultBadge, { backgroundColor: colors.surface, borderColor: colors.border }]}> 
-                          <ThemedText style={{ color: colors.textSecondary, fontSize: 10, fontWeight: '700' }}>Default</ThemedText>
-                        </View>
-                      ) : null}
-                    </View>
-                    <ThemedText style={{ color: colors.textSecondary, fontSize: 12, marginTop: 4 }}>
-                      {watchlist.symbols.length} coin{watchlist.symbols.length === 1 ? '' : 's'}
+                    <ThemedText style={{ color: colors.text, fontWeight: '700', fontSize: 16 }}>
+                      {watchlist.name}
+                    </ThemedText>
+                    <ThemedText style={{ color: colors.textSecondary, fontSize: 12, marginTop: 3 }}>
+                      {subtitle}
                     </ThemedText>
                   </View>
                   <IconSymbol
-                    name={selected ? 'checkmark.circle.fill' : 'circle'}
-                    size={20}
-                    color={selected ? colors.primary : colors.textTertiary}
+                    name={selected ? 'bookmark.fill' : 'bookmark'}
+                    size={22}
+                    color={selected ? colors.primary : colors.textSecondary}
                   />
                 </TouchableOpacity>
               );
             })}
           </View>
 
-          <View style={[styles.createCard, { borderColor: colors.border, backgroundColor: colors.surfaceElevated }]}> 
-            <ThemedText style={{ color: colors.text, fontWeight: '700', marginBottom: 8 }}>Create watchlist</ThemedText>
-            <TextInput
-              value={pickerDraftName}
-              onChangeText={setPickerDraftName}
-              placeholder="New watchlist name"
-              placeholderTextColor={colors.textTertiary}
-              style={[
-                styles.input,
-                {
-                  backgroundColor: colors.surface,
-                  borderColor: colors.border,
-                  color: colors.text,
-                },
-              ]}
-            />
+          {pickerCreateMode ? (
+            <View style={[styles.createCard, { borderColor: colors.border, backgroundColor: colors.surfaceElevated }]}> 
+              <TextInput
+                value={pickerDraftName}
+                onChangeText={setPickerDraftName}
+                placeholder="New watchlist name"
+                placeholderTextColor={colors.textTertiary}
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor: colors.border,
+                    color: colors.text,
+                  },
+                ]}
+              />
+              <View style={styles.createActionsRow}>
+                <TouchableOpacity
+                  style={[styles.secondaryActionButton, { borderColor: colors.border }]}
+                  disabled={pickerBusy}
+                  onPress={() => {
+                    setPickerCreateMode(false);
+                    setPickerDraftName('');
+                    setPickerError(null);
+                  }}
+                >
+                  <ThemedText style={{ color: colors.text, fontWeight: '700' }}>Cancel</ThemedText>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.createButton, { backgroundColor: colors.primary, opacity: pickerBusy ? 0.7 : 1 }]}
+                  disabled={pickerBusy}
+                  onPress={handlePickerCreateWatchlist}
+                >
+                  <ThemedText style={{ color: colors.primaryText, fontWeight: '700' }}>Create</ThemedText>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : (
             <TouchableOpacity
-              style={[styles.createButton, { backgroundColor: colors.primary, opacity: pickerBusy ? 0.7 : 1 }]}
+              style={[styles.newWatchlistButton, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
               disabled={pickerBusy}
-              onPress={handlePickerCreateWatchlist}
+              onPress={() => {
+                setPickerCreateMode(true);
+                setPickerError(null);
+              }}
             >
-              <ThemedText style={{ color: colors.primaryText, fontWeight: '700' }}>Create and save</ThemedText>
+              <IconSymbol name="plus.circle.fill" size={20} color={colors.text} />
+              <ThemedText style={{ color: colors.text, fontWeight: '700' }}>New watchlist</ThemedText>
             </TouchableOpacity>
-          </View>
+          )}
 
           {pickerError ? (
             <ThemedText style={{ color: colors.danger, marginTop: 10 }}>{pickerError}</ThemedText>
           ) : null}
-
-          <TouchableOpacity style={[styles.doneButton, { borderColor: colors.border }]} onPress={closeSavePicker}>
-            <ThemedText style={{ color: colors.text, fontWeight: '700' }}>{t('Done') || 'Done'}</ThemedText>
-          </TouchableOpacity>
         </View>
       </Modal>
     </>
@@ -855,8 +882,8 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     padding: 16,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
     gap: 12,
   },
   sheetHandle: {
@@ -867,23 +894,24 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   sheetList: {
-    gap: 10,
+    gap: 6,
     marginTop: 2,
   },
   sheetRow: {
-    borderWidth: 1,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 4,
+    paddingVertical: 10,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
   },
-  sheetRowTitle: {
-    flexDirection: 'row',
+  sheetThumb: {
+    width: 42,
+    height: 42,
+    borderRadius: 8,
+    borderWidth: 1,
     alignItems: 'center',
-    gap: 8,
-    flexWrap: 'wrap',
+    justifyContent: 'center',
   },
   defaultBadge: {
     paddingHorizontal: 8,
@@ -892,7 +920,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   createCard: {
-    marginTop: 2,
+    marginTop: 4,
     borderWidth: 1,
     borderRadius: 14,
     padding: 14,
@@ -910,13 +938,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 12,
+    flex: 1,
   },
-  doneButton: {
+  createActionsRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  secondaryActionButton: {
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    flex: 1,
+  },
+  newWatchlistButton: {
     marginTop: 4,
     borderRadius: 12,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 12,
+    flexDirection: 'row',
+    gap: 10,
   },
 });

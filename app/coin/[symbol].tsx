@@ -160,16 +160,6 @@ export default function CoinDetailScreen() {
   const formatPercent = (value: number | null) =>
     value == null ? '--' : `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`;
 
-  const formatCompactDollars = (value: number | null) => {
-    if (value == null) return '--';
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      notation: 'compact',
-      maximumFractionDigits: 1,
-    }).format(value);
-  };
-
   const saved = isSaved(symbol);
   const primaryChangeColor = (coin?.change_24h_pct ?? 0) >= 0 ? colors.success : colors.danger;
   const chartRangeChange = chartRange === '1H'
@@ -366,24 +356,6 @@ export default function CoinDetailScreen() {
                     tooltipBackgroundColor={colors.surface}
                     tooltipTextColor={colors.text}
                   />
-                </View>
-
-                <View style={styles.chartMetaRow}>
-                  {[
-                    `${chartRange} view`,
-                    `24h vol ${formatCompactDollars(coin.volume_24h_usd)}`,
-                    chartVariant === 'line' ? 'Line price' : 'Bar price',
-                    'Hover details',
-                  ].map((item) => (
-                    <View
-                      key={item}
-                      style={[styles.chartMetaPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
-                    >
-                      <ThemedText style={{ color: colors.textSecondary, fontSize: 12, fontWeight: '600' }}>
-                        {item}
-                      </ThemedText>
-                    </View>
-                  ))}
                 </View>
               </View>
 
@@ -598,17 +570,6 @@ const styles = StyleSheet.create({
   chartCanvas: {
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  chartMetaRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  chartMetaPill: {
-    borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
   },
   actionsRow: {
     marginTop: 16,

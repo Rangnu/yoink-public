@@ -849,15 +849,14 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
   const sheetResponsiveStyle = useMemo(() => {
     if (Platform.OS !== 'web') return null;
 
+    const sheetWidth = Math.max(320, Math.min(430, viewportWidth - 24));
     return {
-      left: undefined,
-      right: undefined,
+      left: (viewportWidth - sheetWidth) / 2,
       bottom: 16,
-      width: Math.max(320, Math.min(430, viewportWidth - 24)),
+      width: sheetWidth,
       borderRadius: 20,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: colors.border,
-      alignSelf: 'center' as const,
     };
   }, [colors.border, viewportWidth]);
 

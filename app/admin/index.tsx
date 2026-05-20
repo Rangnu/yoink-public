@@ -98,6 +98,12 @@ export default function AdminScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [accessMessage, setAccessMessage] = useState<string | null>(null);
+  const opsPanel = '#0F172A';
+  const opsPanelAlt = '#111827';
+  const opsBorder = '#233047';
+  const opsText = '#F8FAFC';
+  const opsSubtext = '#94A3B8';
+  const opsMuted = '#64748B';
 
   const clientAdminConfigured = hasAdminConfig();
   const clientAdminAllowed = canAccessAdmin(user);
@@ -349,17 +355,17 @@ export default function AdminScreen() {
           />
         )}
       >
-        <View style={[styles.heroCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <View style={[styles.heroCard, styles.opsHeroCard, { backgroundColor: opsPanel, borderColor: opsBorder }]}>
           <View style={styles.heroHeader}>
             <View style={{ flex: 1 }}>
-              <ThemedText type="title" style={{ color: colors.text }}>
+              <ThemedText type="title" style={{ color: opsText }}>
                 Control tower
               </ThemedText>
-              <ThemedText style={{ color: colors.textSecondary, marginTop: 6, lineHeight: 20 }}>
+              <ThemedText style={{ color: opsSubtext, marginTop: 6, lineHeight: 20 }}>
                 Monitor feed health, adoption, and the coins people save most.
               </ThemedText>
             </View>
-            <View style={[styles.statusPill, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
+            <View style={[styles.statusPill, { backgroundColor: 'rgba(255,255,255,0.04)', borderColor: opsBorder }]}>
               <ThemedText style={{ color: effectiveFeedHealthTone, fontWeight: '700', fontSize: 12 }}>
                 {effectiveFeedHealth.toUpperCase()}
               </ThemedText>
@@ -372,36 +378,66 @@ export default function AdminScreen() {
               value={`${edgeStatus?.coinData.coinsCount ?? rows.length}`}
               detail={privilegedStatus === 'edge' ? 'live catalog' : 'public market rows'}
               colors={colors}
+              dark
+              panelColor={opsPanelAlt}
+              panelBorder={opsBorder}
+              textColor={opsText}
+              subtextColor={opsSubtext}
             />
             <AdminStatCard
               label="Users"
               value={usersCount == null ? '--' : formatCompactNumber(usersCount)}
               detail={usersCount == null ? 'privileged auth count unavailable' : 'auth accounts'}
               colors={colors}
+              dark
+              panelColor={opsPanelAlt}
+              panelBorder={opsBorder}
+              textColor={opsText}
+              subtextColor={opsSubtext}
             />
             <AdminStatCard
               label="Watchlist users"
               value={formatCompactNumber(watchlistUsersCount)}
               detail="users with saved lists"
               colors={colors}
+              dark
+              panelColor={opsPanelAlt}
+              panelBorder={opsBorder}
+              textColor={opsText}
+              subtextColor={opsSubtext}
             />
             <AdminStatCard
               label="Saved items"
               value={formatCompactNumber(edgeStatus?.ops.watchlistItemsCount ?? 0)}
               detail={`${formatCompactNumber(edgeStatus?.ops.watchlistsCount ?? 0)} watchlists`}
               colors={colors}
+              dark
+              panelColor={opsPanelAlt}
+              panelBorder={opsBorder}
+              textColor={opsText}
+              subtextColor={opsSubtext}
             />
             <AdminStatCard
               label="Feed lag"
               value={effectiveMinutesSinceUpdate == null ? '--' : `${effectiveMinutesSinceUpdate}m`}
               detail={effectiveLatestTimestamp ? formatRelativeTime(effectiveLatestTimestamp) : 'no timestamp'}
               colors={colors}
+              dark
+              panelColor={opsPanelAlt}
+              panelBorder={opsBorder}
+              textColor={opsText}
+              subtextColor={opsSubtext}
             />
             <AdminStatCard
               label="Run failures"
               value={`${edgeStatus?.ingest.failedRuns24h ?? 0}`}
               detail="last 24h"
               colors={colors}
+              dark
+              panelColor={opsPanelAlt}
+              panelBorder={opsBorder}
+              textColor={opsText}
+              subtextColor={opsSubtext}
             />
           </View>
         </View>
@@ -429,11 +465,11 @@ export default function AdminScreen() {
           </View>
         ) : null}
 
-        <View style={[styles.sectionCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <View style={[styles.sectionCard, styles.opsSectionCard, { backgroundColor: opsPanel, borderColor: opsBorder }]}>
           <ThemedText type="subtitle" style={{ color: colors.text, fontSize: 18 }}>
             Market breadth
           </ThemedText>
-          <ThemedText style={{ color: colors.textSecondary, marginTop: 6, lineHeight: 20 }}>
+          <ThemedText style={{ color: opsSubtext, marginTop: 6, lineHeight: 20 }}>
             Positive vs negative 24h movers across the current live market set.
           </ThemedText>
 
@@ -444,31 +480,31 @@ export default function AdminScreen() {
           </View>
 
           <View style={styles.legendRow}>
-            <LegendChip label={`Up ${positive24hCount}`} color={colors.success} colors={colors} />
-            <LegendChip label={`Flat ${flat24hCount}`} color={colors.textTertiary} colors={colors} />
-            <LegendChip label={`Down ${negative24hCount}`} color={colors.danger} colors={colors} />
+            <LegendChip label={`Up ${positive24hCount}`} color={colors.success} colors={colors} dark />
+            <LegendChip label={`Flat ${flat24hCount}`} color={opsMuted} colors={colors} dark />
+            <LegendChip label={`Down ${negative24hCount}`} color={colors.danger} colors={colors} dark />
           </View>
         </View>
 
-        <View style={[styles.sectionCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <ThemedText type="subtitle" style={{ color: colors.text, fontSize: 18 }}>
+        <View style={[styles.sectionCard, styles.opsSectionCard, { backgroundColor: opsPanel, borderColor: opsBorder }]}>
+          <ThemedText type="subtitle" style={{ color: opsText, fontSize: 18 }}>
             Ingest pulse
           </ThemedText>
-          <ThemedText style={{ color: colors.textSecondary, marginTop: 6, lineHeight: 20 }}>
+          <ThemedText style={{ color: opsSubtext, marginTop: 6, lineHeight: 20 }}>
             Recent run strip plus the latest feed timestamp.
           </ThemedText>
 
-          <RunPulse runs={recentRuns} colors={colors} />
+          <RunPulse runs={recentRuns} colors={colors} dark />
 
           <View style={styles.infoRows}>
-            <InfoRow label="Feed status" value={effectiveFeedHealth.toUpperCase()} valueColor={effectiveFeedHealthTone} colors={colors} />
-            <InfoRow label="Latest snapshot" value={effectiveLatestTimestamp ? new Date(effectiveLatestTimestamp).toLocaleString() : '--'} colors={colors} />
-            <InfoRow label="1h gaps" value={`${missing1h}`} colors={colors} />
-            <InfoRow label="24h gaps" value={`${missing24h}`} colors={colors} />
-            <InfoRow label="Recent runs" value={`${edgeStatus?.ingest.runCount ?? 0}`} colors={colors} />
-            <InfoRow label="Failed runs (24h)" value={`${edgeStatus?.ingest.failedRuns24h ?? 0}`} valueColor={(edgeStatus?.ingest.failedRuns24h ?? 0) > 0 ? colors.danger : colors.success} colors={colors} />
+            <InfoRow label="Feed status" value={effectiveFeedHealth.toUpperCase()} valueColor={effectiveFeedHealthTone} colors={colors} dark />
+            <InfoRow label="Latest snapshot" value={effectiveLatestTimestamp ? new Date(effectiveLatestTimestamp).toLocaleString() : '--'} colors={colors} dark />
+            <InfoRow label="1h gaps" value={`${missing1h}`} colors={colors} dark />
+            <InfoRow label="24h gaps" value={`${missing24h}`} colors={colors} dark />
+            <InfoRow label="Recent runs" value={`${edgeStatus?.ingest.runCount ?? 0}`} colors={colors} dark />
+            <InfoRow label="Failed runs (24h)" value={`${edgeStatus?.ingest.failedRuns24h ?? 0}`} valueColor={(edgeStatus?.ingest.failedRuns24h ?? 0) > 0 ? colors.danger : colors.success} colors={colors} dark />
             {edgeStatus?.ingest.lastFailure?.error ? (
-              <InfoRow label="Last failure" value={truncate(edgeStatus.ingest.lastFailure.error, 52)} valueColor={colors.danger} colors={colors} />
+              <InfoRow label="Last failure" value={truncate(edgeStatus.ingest.lastFailure.error, 52)} valueColor={colors.danger} colors={colors} dark />
             ) : null}
           </View>
         </View>
@@ -489,11 +525,11 @@ export default function AdminScreen() {
           </View>
         </View>
 
-        <View style={[styles.sectionCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <ThemedText type="subtitle" style={{ color: colors.text, fontSize: 18 }}>
+        <View style={[styles.sectionCard, styles.opsSectionCard, { backgroundColor: opsPanel, borderColor: opsBorder }]}>
+          <ThemedText type="subtitle" style={{ color: opsText, fontSize: 18 }}>
             Most saved by users
           </ThemedText>
-          <ThemedText style={{ color: colors.textSecondary, marginTop: 6, lineHeight: 20 }}>
+          <ThemedText style={{ color: opsSubtext, marginTop: 6, lineHeight: 20 }}>
             Distinct users first, raw saves second.
           </ThemedText>
 
@@ -508,19 +544,19 @@ export default function AdminScreen() {
                   <View style={styles.savedRowHeader}>
                     <View>
                       <ThemedText style={{ color: colors.text, fontWeight: '700' }}>{coin.symbol}</ThemedText>
-                      <ThemedText style={{ color: colors.textSecondary, fontSize: 12, marginTop: 2 }}>{coin.name}</ThemedText>
+                      <ThemedText style={{ color: opsSubtext, fontSize: 12, marginTop: 2 }}>{coin.name}</ThemedText>
                     </View>
                     <View style={{ alignItems: 'flex-end' }}>
-                      <ThemedText style={{ color: colors.text, fontWeight: '700' }}>{coin.userCount} users</ThemedText>
-                      <ThemedText style={{ color: colors.textTertiary, fontSize: 12, marginTop: 2 }}>{coin.saveCount} saves</ThemedText>
+                      <ThemedText style={{ color: opsText, fontWeight: '700' }}>{coin.userCount} users</ThemedText>
+                      <ThemedText style={{ color: opsSubtext, fontSize: 12, marginTop: 2 }}>{coin.saveCount} saves</ThemedText>
                     </View>
                   </View>
-                  <View style={[styles.savedBarTrack, { backgroundColor: colors.surfaceElevated }]}>
+                  <View style={[styles.savedBarTrack, { backgroundColor: 'rgba(255,255,255,0.06)' }]}>
                     <View
                       style={[
                         styles.savedBarFill,
                         {
-                          backgroundColor: colors.primary,
+                          backgroundColor: colors.success,
                           width: `${Math.max(8, Math.round((coin.userCount / topSavedMaxUsers) * 100))}%`,
                         },
                       ]}
@@ -530,7 +566,7 @@ export default function AdminScreen() {
               ))}
             </View>
           ) : (
-            <ThemedText style={{ color: colors.textSecondary, marginTop: 12 }}>
+            <ThemedText style={{ color: opsSubtext, marginTop: 12 }}>
               No saved-coin activity has been recorded yet.
             </ThemedText>
           )}
@@ -567,17 +603,17 @@ export default function AdminScreen() {
           </View>
         </View>
 
-        <View style={[styles.sectionCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <ThemedText type="subtitle" style={{ color: colors.text, fontSize: 18 }}>
+        <View style={[styles.sectionCard, styles.opsSectionCard, { backgroundColor: opsPanel, borderColor: opsBorder }]}>
+          <ThemedText type="subtitle" style={{ color: opsText, fontSize: 18 }}>
             Access & backend
           </ThemedText>
 
           <View style={styles.infoRows}>
-            <InfoRow label="Admin email" value={user.email ?? '--'} colors={colors} />
-            <InfoRow label="Client allowlist configured" value={clientAdminConfigured ? 'yes' : 'no'} colors={colors} />
-            <InfoRow label="Client admin allowed" value={clientAdminAllowed ? 'yes' : 'no'} colors={colors} />
-            <InfoRow label="Source" value={privilegedStatus === 'edge' ? 'admin-status function' : 'public fallback'} valueColor={privilegedStatus === 'edge' ? colors.success : '#FFB020'} colors={colors} />
-            <InfoRow label="Backend allowlist source" value={edgeStatus ? edgeStatus.admin.allowlistSource : '--'} colors={colors} />
+            <InfoRow label="Admin email" value={user.email ?? '--'} colors={colors} dark />
+            <InfoRow label="Client allowlist configured" value={clientAdminConfigured ? 'yes' : 'no'} colors={colors} dark />
+            <InfoRow label="Client admin allowed" value={clientAdminAllowed ? 'yes' : 'no'} colors={colors} dark />
+            <InfoRow label="Source" value={privilegedStatus === 'edge' ? 'admin-status function' : 'public fallback'} valueColor={privilegedStatus === 'edge' ? colors.success : '#FFB020'} colors={colors} dark />
+            <InfoRow label="Backend allowlist source" value={edgeStatus ? edgeStatus.admin.allowlistSource : '--'} colors={colors} dark />
           </View>
 
           <View style={styles.statusList}>
@@ -586,6 +622,7 @@ export default function AdminScreen() {
               tone={colors.success}
               text="Protected admin access is enforced via email allowlist."
               colors={colors}
+              dark
             />
             <StatusRow
               icon="clock.badge.exclamationmark"
@@ -594,6 +631,7 @@ export default function AdminScreen() {
                 ? 'Privileged dashboard is active through the protected admin function.'
                 : 'Current dashboard is still on public fallback data until the admin function is deployed.'}
               colors={colors}
+              dark
             />
             <StatusRow
               icon="lock.shield.fill"
@@ -602,12 +640,14 @@ export default function AdminScreen() {
                 ? `Backend admin access is currently resolved via ${edgeStatus.admin.allowlistSource}.`
                 : 'Backend admin access can be resolved by either the admin_allowlist table or the ADMIN_EMAILS secret.'}
               colors={colors}
+              dark
             />
             <StatusRow
               icon="bubble.left.and.bubble.right"
               tone={colors.text}
               text={edgeStatus?.moderation.reason ?? 'Community moderation queue is a placeholder until posts/comments ship.'}
               colors={colors}
+              dark
             />
           </View>
         </View>
@@ -669,19 +709,29 @@ function AdminStatCard({
   value,
   detail,
   colors,
+  dark = false,
+  panelColor,
+  panelBorder,
+  textColor,
+  subtextColor,
 }: {
   label: string;
   value: string;
   detail: string;
   colors: any;
+  dark?: boolean;
+  panelColor?: string;
+  panelBorder?: string;
+  textColor?: string;
+  subtextColor?: string;
 }) {
   return (
-    <View style={[styles.statCard, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
-      <ThemedText style={{ color: colors.textSecondary, fontSize: 12 }}>{label}</ThemedText>
-      <ThemedText style={{ color: colors.text, fontSize: 22, fontWeight: '700', marginTop: 8 }}>
+    <View style={[styles.statCard, dark ? styles.opsStatCard : null, { backgroundColor: panelColor ?? colors.surfaceElevated, borderColor: panelBorder ?? colors.border }]}>
+      <ThemedText style={{ color: subtextColor ?? colors.textSecondary, fontSize: 12 }}>{label}</ThemedText>
+      <ThemedText style={{ color: textColor ?? colors.text, fontSize: 22, fontWeight: '700', marginTop: 8 }}>
         {value}
       </ThemedText>
-      <ThemedText style={{ color: colors.textTertiary, fontSize: 12, marginTop: 6 }}>
+      <ThemedText style={{ color: subtextColor ?? colors.textTertiary, fontSize: 12, marginTop: 6 }}>
         {detail}
       </ThemedText>
     </View>
@@ -693,16 +743,18 @@ function InfoRow({
   value,
   colors,
   valueColor,
+  dark = false,
 }: {
   label: string;
   value: string;
   colors: any;
   valueColor?: string;
+  dark?: boolean;
 }) {
   return (
     <View style={styles.infoRow}>
-      <ThemedText style={{ color: colors.textSecondary }}>{label}</ThemedText>
-      <ThemedText style={{ color: valueColor ?? colors.text, fontWeight: '700', flexShrink: 1, textAlign: 'right' }}>
+      <ThemedText style={{ color: dark ? '#94A3B8' : colors.textSecondary }}>{label}</ThemedText>
+      <ThemedText style={{ color: valueColor ?? (dark ? '#F8FAFC' : colors.text), fontWeight: '700', flexShrink: 1, textAlign: 'right' }}>
         {value}
       </ThemedText>
     </View>
@@ -714,27 +766,29 @@ function StatusRow({
   text,
   tone,
   colors,
+  dark = false,
 }: {
   icon: any;
   text: string;
   tone: string;
   colors: any;
+  dark?: boolean;
 }) {
   return (
     <View style={styles.statusRow}>
       <IconSymbol name={icon} size={16} color={tone} />
-      <ThemedText style={{ color: colors.textSecondary, flex: 1, lineHeight: 20 }}>
+      <ThemedText style={{ color: dark ? '#94A3B8' : colors.textSecondary, flex: 1, lineHeight: 20 }}>
         {text}
       </ThemedText>
     </View>
   );
 }
 
-function RunPulse({ runs, colors }: { runs: AdminStatusPayload['ingest']['recentRuns']; colors: any }) {
+function RunPulse({ runs, colors, dark = false }: { runs: AdminStatusPayload['ingest']['recentRuns']; colors: any; dark?: boolean }) {
   if (!runs?.length) {
     return (
-      <View style={[styles.infoCardInline, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
-        <ThemedText style={{ color: colors.textSecondary }}>No recent ingest runs recorded.</ThemedText>
+      <View style={[styles.infoCardInline, { backgroundColor: dark ? '#111827' : colors.surfaceElevated, borderColor: dark ? '#233047' : colors.border }]}>
+        <ThemedText style={{ color: dark ? '#94A3B8' : colors.textSecondary }}>No recent ingest runs recorded.</ThemedText>
       </View>
     );
   }
@@ -749,7 +803,7 @@ function RunPulse({ runs, colors }: { runs: AdminStatusPayload['ingest']['recent
         return (
           <View key={`${run.id}-${run.started_at}`} style={styles.runPulseItem}>
             <View style={[styles.runPulseBar, { backgroundColor: barColor, opacity: running ? 0.75 : 1 }]} />
-            <ThemedText style={{ color: colors.textTertiary, fontSize: 10 }}>{run.id}</ThemedText>
+            <ThemedText style={{ color: dark ? '#64748B' : colors.textTertiary, fontSize: 10 }}>{run.id}</ThemedText>
           </View>
         );
       })}
@@ -757,11 +811,11 @@ function RunPulse({ runs, colors }: { runs: AdminStatusPayload['ingest']['recent
   );
 }
 
-function LegendChip({ label, color, colors }: { label: string; color: string; colors: any }) {
+function LegendChip({ label, color, colors, dark = false }: { label: string; color: string; colors: any; dark?: boolean }) {
   return (
-    <View style={[styles.legendChip, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
+    <View style={[styles.legendChip, { backgroundColor: dark ? '#111827' : colors.surfaceElevated, borderColor: dark ? '#233047' : colors.border }]}>
       <View style={[styles.legendDot, { backgroundColor: color }]} />
-      <ThemedText style={{ color: colors.textSecondary, fontSize: 12, fontWeight: '600' }}>{label}</ThemedText>
+      <ThemedText style={{ color: dark ? '#CBD5E1' : colors.textSecondary, fontSize: 12, fontWeight: '600' }}>{label}</ThemedText>
     </View>
   );
 }
@@ -825,6 +879,23 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 14,
     minHeight: 108,
+  },
+  opsHeroCard: {
+    shadowColor: '#020617',
+    shadowOpacity: 0.25,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 4,
+  },
+  opsSectionCard: {
+    shadowColor: '#020617',
+    shadowOpacity: 0.18,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 3,
+  },
+  opsStatCard: {
+    minHeight: 98,
   },
   sectionCard: {
     borderWidth: 1,

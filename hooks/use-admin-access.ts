@@ -37,7 +37,19 @@ export function useAdminAccess(): AdminAccessState {
 
     const check = async () => {
       try {
-        const result = await supabase.functions.invoke('admin-status', { body: {} });
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        const accessToken = session?.access_token;
+
+        const result = await supabase.functions.invoke('admin-status', {
+          body: {},
+          headers: accessToken
+            ? {
+                Authorization: `Bearer ${accessToken}`,
+              }
+            : undefined,
+        });
         if (!active) return;
 
         if (!result.error && result.data) {

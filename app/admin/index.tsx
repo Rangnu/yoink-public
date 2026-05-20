@@ -130,7 +130,19 @@ export default function AdminScreen() {
       setError(null);
       setAccessMessage(null);
 
-      const adminStatusResult = await supabase.functions.invoke('admin-status', { body: {} });
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const accessToken = session?.access_token;
+
+      const adminStatusResult = await supabase.functions.invoke('admin-status', {
+        body: {},
+        headers: accessToken
+          ? {
+              Authorization: `Bearer ${accessToken}`,
+            }
+          : undefined,
+      });
 
       if (!adminStatusResult.error && adminStatusResult.data) {
         const nextRows = await fetchCoinMarketRows(120);

@@ -407,7 +407,7 @@ export default function HomeScreen() {
               stock={stock}
               visible={visible}
               chartRange={tab === 'yoink' ? '1H' : '24H'}
-              onPress={visible ? () => router.push({ pathname: '/coin/[symbol]' as any, params: { symbol: stock.symbol } }) : undefined}
+              onPress={visible ? () => router.push({ pathname: '/coin' as any, params: { symbol: stock.symbol } }) : undefined}
               formatDollarMove={formatDollarMove}
               colors={colors}
             />
@@ -429,7 +429,7 @@ export default function HomeScreen() {
                 stock={stock}
                 visible={visible}
                 chartRange={tab === 'yoink' ? '1H' : '24H'}
-                onPress={visible ? () => router.push({ pathname: '/coin/[symbol]' as any, params: { symbol: stock.symbol } }) : undefined}
+                onPress={visible ? () => router.push({ pathname: '/coin' as any, params: { symbol: stock.symbol } }) : undefined}
                 formatDollarMove={formatDollarMove}
                 colors={colors}
               />
@@ -966,7 +966,7 @@ function MarketsSection({ colors, showHeader = true }: { colors: any; showHeader
                   <TouchableOpacity
                     key={idx}
                     style={[marketStyles.marketCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
-                    onPress={() => item.symbol && router.push({ pathname: '/coin/[symbol]' as any, params: { symbol: item.symbol } })}
+                    onPress={() => item.symbol && router.push({ pathname: '/coin' as any, params: { symbol: item.symbol } })}
                   > 
                     <ThemedText style={{ color: colors.text, fontSize: 13, fontWeight: '600' }} numberOfLines={1}>
                       {item.name}

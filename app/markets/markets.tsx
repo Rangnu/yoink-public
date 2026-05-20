@@ -158,7 +158,7 @@ export default function MarketsScreen() {
             <TouchableOpacity
               key={item.symbol}
               style={[styles.marketRow, { backgroundColor: colors.background, borderBottomColor: colors.border }]}
-              onPress={() => router.push({ pathname: '/coin/[symbol]' as any, params: { symbol: item.symbol } })}
+              onPress={() => router.push({ pathname: '/coin' as any, params: { symbol: item.symbol } })}
             >
               <ThemedText style={{ color: colors.textSecondary, width: 24, textAlign: 'right' }}>{idx + 1}</ThemedText>
               <View style={styles.nameSection}>

@@ -173,7 +173,7 @@ export function SavedCoinsContent({
           <TouchableOpacity
             key={row.symbol}
             style={[styles.rowCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
-            onPress={() => router.push({ pathname: '/coin/[symbol]' as any, params: { symbol: row.symbol } })}
+            onPress={() => router.push({ pathname: '/coin' as any, params: { symbol: row.symbol } })}
           >
             <View style={styles.rowLeft}>
               <View style={[styles.rankBadge, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>

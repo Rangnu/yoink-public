@@ -267,7 +267,7 @@ export default function ExploreScreen() {
                 metricLabel={row.metricLabel}
                 metricValue={row.metricValue}
                 saved={saved}
-                onPress={() => router.push({ pathname: '/coin/[symbol]' as any, params: { symbol: row.s } })}
+                onPress={() => router.push({ pathname: '/coin' as any, params: { symbol: row.s } })}
                 onToggleSaved={() => toggleSaved(row.s)}
                 colors={colors}
               />

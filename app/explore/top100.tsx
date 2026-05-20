@@ -152,7 +152,7 @@ export default function Top100Screen() {
                 <TouchableOpacity
                   key={row.symbol}
                   style={[styles.row, { borderBottomColor: colors.border }]}
-                  onPress={() => router.push({ pathname: '/coin/[symbol]' as any, params: { symbol: row.symbol } })}
+                  onPress={() => router.push({ pathname: '/coin' as any, params: { symbol: row.symbol } })}
                 >
                   <ThemedText style={{ color: colors.textSecondary, width: 28, textAlign: 'right', marginRight: 6 }}>
                     {index + 1}

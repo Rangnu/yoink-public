@@ -63,7 +63,7 @@ export function ActivityEventList({
 
           const onPress =
             event.entityType === 'coin'
-              ? () => router.push({ pathname: '/coin/[symbol]' as any, params: { symbol: event.entityId } })
+              ? () => router.push({ pathname: '/coin' as any, params: { symbol: event.entityId } })
               : undefined;
 
           return (

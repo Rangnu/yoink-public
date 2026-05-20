@@ -305,7 +305,7 @@ export default function ScoutersScreen() {
                   <TouchableOpacity
                     key={`${match.scouterId}-${match.symbol}`}
                     style={[styles.matchCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
-                    onPress={() => router.push({ pathname: '/coin/[symbol]' as any, params: { symbol: match.symbol } })}
+                    onPress={() => router.push({ pathname: '/coin' as any, params: { symbol: match.symbol } })}
                   >
                     <ThemedText style={{ color: colors.text, fontSize: 14, fontWeight: '700' }}>
                       {match.symbol}
@@ -401,7 +401,7 @@ export default function ScoutersScreen() {
                     <TouchableOpacity
                       key={`${selectedScouter.id}-${match.symbol}`}
                       style={[styles.rowCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
-                      onPress={() => router.push({ pathname: '/coin/[symbol]' as any, params: { symbol: match.symbol } })}
+                      onPress={() => router.push({ pathname: '/coin' as any, params: { symbol: match.symbol } })}
                     >
                       <View style={{ flex: 1 }}>
                         <View style={styles.rowTop}>

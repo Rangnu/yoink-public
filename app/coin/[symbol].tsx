@@ -356,7 +356,7 @@ export default function CoinDetailScreen() {
                     symbol={coin.symbol}
                     color={chartRangeChangeColor}
                     width={chartWidth}
-                    height={220}
+                    height={184}
                     range={chartRange}
                     variant={chartVariant}
                     interactive

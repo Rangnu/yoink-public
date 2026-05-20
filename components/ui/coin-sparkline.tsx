@@ -3,6 +3,8 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { GestureResponderEvent, PointerEvent, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Line, Polygon, Polyline, Rect } from 'react-native-svg';
 
+import { useTheme } from '@/contexts/theme-context';
+
 export type CoinChartRange = '1H' | '24H' | '7D';
 
 type CoinSparklineProps = {
@@ -126,6 +128,7 @@ export function CoinSparkline({
   tooltipBackgroundColor = 'rgba(18, 18, 18, 0.96)',
   tooltipTextColor = '#FFFFFF',
 }: CoinSparklineProps) {
+  const { colors, resolvedTheme } = useTheme();
   const [rawSeries, setRawSeries] = useState<SparklineDatum[] | null>(null);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
@@ -239,7 +242,7 @@ export function CoinSparkline({
       return;
     }
 
-    setSelectedIndex(series.length - 1);
+    setSelectedIndex(null);
   }, [interactive, series]);
 
   const metrics = useMemo(() => {
@@ -338,7 +341,10 @@ export function CoinSparkline({
   const tooltipLeft = selectedPoint
     ? clamp(selectedPoint.x - tooltipWidth / 2, 8, Math.max(8, width - tooltipWidth - 8))
     : 0;
-  const interactionBottom = showVolumeBars ? metrics.volumeBottom : metrics.priceBottom;
+  const gridStroke = colors.border;
+  const neutralBarFill = resolvedTheme === 'dark' ? colors.textTertiary : '#AEB7C8';
+  const neutralVolumeFill = resolvedTheme === 'dark' ? '#3B4558' : '#D7DFEC';
+  const selectionStroke = resolvedTheme === 'dark' ? 'rgba(255,255,255,0.18)' : 'rgba(31,41,55,0.18)';
 
   return (
     <View style={[styles.container, { width, height: interactive ? height + 48 : height }]}>
@@ -389,7 +395,8 @@ export function CoinSparkline({
               y1={y}
               x2={width}
               y2={y}
-              stroke="rgba(255,255,255,0.08)"
+              stroke={gridStroke}
+              opacity={resolvedTheme === 'dark' ? 0.45 : 0.55}
               strokeDasharray="4 4"
               strokeWidth={1}
             />
@@ -403,7 +410,8 @@ export function CoinSparkline({
               y1={metrics.volumeTop - metrics.panelGap / 2}
               x2={width}
               y2={metrics.volumeTop - metrics.panelGap / 2}
-              stroke="rgba(255,255,255,0.1)"
+              stroke={gridStroke}
+              opacity={resolvedTheme === 'dark' ? 0.5 : 0.7}
               strokeWidth={1}
             />
             {metrics.plotted.map((point, index) => {
@@ -418,8 +426,8 @@ export function CoinSparkline({
                   width={metrics.volumeBarWidth}
                   height={Math.max(2, point.volumeBarHeight)}
                   rx={Math.min(3, metrics.volumeBarWidth / 2)}
-                  fill={isSelected ? color : 'rgba(255,255,255,0.18)'}
-                  opacity={isSelected ? 0.95 : 0.9}
+                  fill={isSelected ? neutralBarFill : neutralVolumeFill}
+                  opacity={isSelected ? (resolvedTheme === 'dark' ? 0.95 : 0.9) : resolvedTheme === 'dark' ? 0.85 : 1}
                 />
               );
             })}
@@ -440,8 +448,8 @@ export function CoinSparkline({
                 width={metrics.priceBarWidth}
                 height={barHeight}
                 rx={Math.min(4, metrics.priceBarWidth / 2)}
-                fill={isSelected ? color : 'rgba(255,255,255,0.24)'}
-                opacity={isSelected ? 1 : 0.88}
+                fill={isSelected ? color : neutralBarFill}
+                opacity={isSelected ? 1 : resolvedTheme === 'dark' ? 0.8 : 0.95}
               />
             );
           })
@@ -460,8 +468,8 @@ export function CoinSparkline({
               x1={selectedPoint.x}
               y1={metrics.priceTop}
               x2={selectedPoint.x}
-              y2={interactionBottom}
-              stroke="rgba(255,255,255,0.18)"
+              y2={metrics.priceBottom}
+              stroke={selectionStroke}
               strokeDasharray="4 4"
               strokeWidth={1}
             />

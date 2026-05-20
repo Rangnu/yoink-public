@@ -260,6 +260,10 @@ export default function AdminScreen() {
   const flat24hCount = Math.max(0, rows.length - positive24hCount - negative24hCount);
   const recentRuns = edgeStatus?.ingest.recentRuns ?? [];
   const topSavedMaxUsers = Math.max(1, ...topSavedCoins.map((item) => item.userCount));
+  const usersWithoutWatchlists = usersCount == null ? 0 : Math.max(0, usersCount - watchlistUsersCount);
+  const priceCoveragePct = rows.length ? Math.round(((rows.length - missingPrices) / rows.length) * 100) : 0;
+  const change1hCoveragePct = rows.length ? Math.round(((rows.length - missing1h) / rows.length) * 100) : 0;
+  const change24hCoveragePct = rows.length ? Math.round(((rows.length - missing24h) / rows.length) * 100) : 0;
   const stalePreview = useMemo(
     () =>
       [...rows]
@@ -466,7 +470,7 @@ export default function AdminScreen() {
         ) : null}
 
         <View style={[styles.sectionCard, styles.opsSectionCard, { backgroundColor: opsPanel, borderColor: opsBorder }]}>
-          <ThemedText type="subtitle" style={{ color: colors.text, fontSize: 18 }}>
+          <ThemedText type="subtitle" style={{ color: opsText, fontSize: 18 }}>
             Market breadth
           </ThemedText>
           <ThemedText style={{ color: opsSubtext, marginTop: 6, lineHeight: 20 }}>
@@ -516,6 +520,19 @@ export default function AdminScreen() {
           <ThemedText style={{ color: colors.textSecondary, marginTop: 6, lineHeight: 20 }}>
             How users are actually using saved coins and watchlists right now.
           </ThemedText>
+
+          {usersCount != null ? (
+            <>
+              <View style={styles.breadthBar}>
+                <View style={[styles.breadthSegment, { flex: watchlistUsersCount || 1, backgroundColor: colors.primary }]} />
+                <View style={[styles.breadthSegment, { flex: usersWithoutWatchlists || 1, backgroundColor: colors.surfaceElevated }]} />
+              </View>
+              <View style={styles.legendRow}>
+                <LegendChip label={`With lists ${watchlistUsersCount}`} color={colors.primary} colors={colors} />
+                <LegendChip label={`Without lists ${usersWithoutWatchlists}`} color={colors.textTertiary} colors={colors} />
+              </View>
+            </>
+          ) : null}
 
           <View style={styles.metricsGrid}>
             <AdminStatCard label="Users with lists" value={formatCompactNumber(watchlistUsersCount)} detail={usersCount ? `${Math.round((watchlistUsersCount / usersCount) * 100)}% of users` : 'watchlist owners'} colors={colors} />
@@ -576,6 +593,12 @@ export default function AdminScreen() {
           <ThemedText type="subtitle" style={{ color: colors.text, fontSize: 18 }}>
             Data quality
           </ThemedText>
+
+          <View style={styles.coverageList}>
+            <CoverageRow label="Price coverage" value={priceCoveragePct} color={colors.success} colors={colors} />
+            <CoverageRow label="1h change coverage" value={change1hCoveragePct} color="#38BDF8" colors={colors} />
+            <CoverageRow label="24h change coverage" value={change24hCoveragePct} color="#A78BFA" colors={colors} />
+          </View>
 
           <View style={styles.infoRows}>
             <InfoRow label="Missing prices" value={`${missingPrices}`} colors={colors} />
@@ -820,6 +843,20 @@ function LegendChip({ label, color, colors, dark = false }: { label: string; col
   );
 }
 
+function CoverageRow({ label, value, color, colors }: { label: string; value: number; color: string; colors: any }) {
+  return (
+    <View style={styles.coverageRow}>
+      <View style={styles.coverageHeader}>
+        <ThemedText style={{ color: colors.textSecondary }}>{label}</ThemedText>
+        <ThemedText style={{ color: colors.text, fontWeight: '700' }}>{value}%</ThemedText>
+      </View>
+      <View style={[styles.coverageTrack, { backgroundColor: colors.surfaceElevated }]}>
+        <View style={[styles.coverageFill, { backgroundColor: color, width: `${Math.max(6, value)}%` }]} />
+      </View>
+    </View>
+  );
+}
+
 function formatCompactDollars(value: number | null) {
   if (value == null) return '--';
   return new Intl.NumberFormat('en-US', {
@@ -977,6 +1014,28 @@ const styles = StyleSheet.create({
   topSavedList: {
     marginTop: 14,
     gap: 12,
+  },
+  coverageList: {
+    marginTop: 14,
+    gap: 12,
+  },
+  coverageRow: {
+    gap: 6,
+  },
+  coverageHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+    alignItems: 'center',
+  },
+  coverageTrack: {
+    height: 10,
+    borderRadius: 999,
+    overflow: 'hidden',
+  },
+  coverageFill: {
+    height: '100%',
+    borderRadius: 999,
   },
   savedRow: {
     gap: 8,

@@ -1,27 +1,58 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { Modal, Pressable, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 
+import { ThemedText } from '@/components/themed-text';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useActivity } from '@/contexts/activity-context';
 import { useAuth } from '@/contexts/auth-context';
+import { useSettings } from '@/contexts/settings-context';
+import { useTheme } from '@/contexts/theme-context';
 import { supabase } from '@/utils/supabase';
 
-type WatchlistMode = 'guest' | 'account';
-type WatchlistSyncState = 'idle' | 'syncing' | 'error';
+export type WatchlistMode = 'guest' | 'account';
+export type WatchlistSyncState = 'idle' | 'syncing' | 'error';
+export type WatchlistSummary = {
+  id: string;
+  name: string;
+  isDefault: boolean;
+  symbols: string[];
+  createdAt?: string;
+  updatedAt?: string;
+  local?: boolean;
+};
 
 type WatchlistContextValue = {
   symbols: string[];
   loading: boolean;
   mode: WatchlistMode;
   syncState: WatchlistSyncState;
-  isSaved: (symbol: string) => boolean;
-  saveCoin: (symbol: string) => Promise<void>;
-  removeCoin: (symbol: string) => Promise<void>;
+  watchlists: WatchlistSummary[];
+  defaultWatchlistId: string | null;
+  isSaved: (symbol: string, watchlistId?: string) => boolean;
+  getWatchlistsForSymbol: (symbol: string) => WatchlistSummary[];
+  saveCoin: (symbol: string, watchlistId?: string) => Promise<void>;
+  removeCoin: (symbol: string, watchlistId?: string) => Promise<void>;
   toggleSaved: (symbol: string) => Promise<void>;
   reload: () => Promise<void>;
+  createWatchlist: (name: string) => Promise<WatchlistSummary | null>;
+  renameWatchlist: (watchlistId: string, name: string) => Promise<void>;
+  deleteWatchlist: (watchlistId: string) => Promise<void>;
+  openSavePicker: (symbol: string) => void;
+  closeSavePicker: () => void;
+};
+
+type WatchlistRow = {
+  id: string;
+  name: string;
+  is_default: boolean;
+  created_at: string;
+  updated_at: string;
 };
 
 const STORAGE_KEY = 'saved_coin_symbols_v1';
 const DEFAULT_WATCHLIST_NAME = 'Saved';
+const LOCAL_WATCHLIST_ID = 'local-saved-watchlist';
 
 const WatchlistContext = createContext<WatchlistContextValue | undefined>(undefined);
 
@@ -31,6 +62,32 @@ function normalizeSymbol(symbol: string) {
 
 function uniq(values: string[]) {
   return Array.from(new Set(values.map((value) => normalizeSymbol(value)).filter(Boolean)));
+}
+
+function buildLocalWatchlists(symbols: string[]): WatchlistSummary[] {
+  return [
+    {
+      id: LOCAL_WATCHLIST_ID,
+      name: DEFAULT_WATCHLIST_NAME,
+      isDefault: true,
+      symbols: uniq(symbols),
+      local: true,
+    },
+  ];
+}
+
+function sortWatchlists(rows: WatchlistSummary[]) {
+  return [...rows].sort((a, b) => {
+    if (a.isDefault !== b.isDefault) return a.isDefault ? -1 : 1;
+    const aTime = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+    const bTime = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+    if (aTime !== bTime) return bTime - aTime;
+    return a.name.localeCompare(b.name);
+  });
+}
+
+function unionSymbolsFromWatchlists(rows: WatchlistSummary[]) {
+  return uniq(rows.flatMap((row) => row.symbols));
 }
 
 async function readLocalSymbols() {
@@ -63,15 +120,23 @@ async function resolveCoinIdBySymbol(symbol: string) {
 export function WatchlistProvider({ children }: { children: ReactNode }) {
   const { user, loading: authLoading } = useAuth();
   const { recordEvent } = useActivity();
+  const { t } = useSettings();
+  const { colors } = useTheme();
   const [symbols, setSymbols] = useState<string[]>([]);
+  const [watchlists, setWatchlists] = useState<WatchlistSummary[]>(buildLocalWatchlists([]));
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<WatchlistMode>('guest');
   const [syncState, setSyncState] = useState<WatchlistSyncState>('idle');
   const [bootstrapped, setBootstrapped] = useState(false);
-  const [defaultWatchlistId, setDefaultWatchlistId] = useState<string | null>(null);
+  const [defaultWatchlistId, setDefaultWatchlistId] = useState<string | null>(LOCAL_WATCHLIST_ID);
+  const [pickerSymbol, setPickerSymbol] = useState<string | null>(null);
+  const [pickerBusy, setPickerBusy] = useState(false);
+  const [pickerError, setPickerError] = useState<string | null>(null);
+  const [pickerDraftName, setPickerDraftName] = useState('');
   const symbolsRef = useRef<string[]>([]);
+  const watchlistsRef = useRef<WatchlistSummary[]>(buildLocalWatchlists([]));
 
-  const persistLocalSymbols = useCallback(async (nextSymbols: string[]) => {
+  const persistLocalUnion = useCallback(async (nextSymbols: string[]) => {
     const uniqueSymbols = uniq(nextSymbols);
     symbolsRef.current = uniqueSymbols;
     setSymbols(uniqueSymbols);
@@ -80,126 +145,148 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const ensureDefaultWatchlist = useCallback(
-    async (userId: string) => {
-      if (defaultWatchlistId) return defaultWatchlistId;
+  const setLocalGuestState = useCallback((nextSymbols: string[]) => {
+    const uniqueSymbols = uniq(nextSymbols);
+    const localWatchlists = buildLocalWatchlists(uniqueSymbols);
+    symbolsRef.current = uniqueSymbols;
+    watchlistsRef.current = localWatchlists;
+    setSymbols(uniqueSymbols);
+    setWatchlists(localWatchlists);
+    setDefaultWatchlistId(LOCAL_WATCHLIST_ID);
+  }, []);
 
-      const { data: existing, error: existingError } = await supabase
-        .from('watchlists')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('is_default', true)
-        .limit(1)
-        .maybeSingle();
+  const applyRemoteWatchlists = useCallback(async (nextWatchlists: WatchlistSummary[]) => {
+    const sorted = sortWatchlists(nextWatchlists);
+    watchlistsRef.current = sorted;
+    setWatchlists(sorted);
+    setDefaultWatchlistId(sorted.find((watchlist) => watchlist.isDefault)?.id ?? null);
+    await persistLocalUnion(unionSymbolsFromWatchlists(sorted));
+  }, [persistLocalUnion]);
 
-      if (existingError) throw existingError;
-      if (existing?.id) {
-        setDefaultWatchlistId(existing.id);
-        return existing.id;
-      }
+  const loadRemoteWatchlists = useCallback(async (userId: string) => {
+    const { data: watchlistRows, error: watchlistsError } = await supabase
+      .from('watchlists')
+      .select('id, name, is_default, created_at, updated_at')
+      .eq('user_id', userId)
+      .order('is_default', { ascending: false })
+      .order('updated_at', { ascending: false });
 
-      const { data: inserted, error: insertError } = await supabase
-        .from('watchlists')
-        .insert({
-          user_id: userId,
-          name: DEFAULT_WATCHLIST_NAME,
-          is_default: true,
-        })
-        .select('id')
-        .single();
+    if (watchlistsError) throw watchlistsError;
 
-      if (insertError) {
-        const { data: retryExisting, error: retryError } = await supabase
-          .from('watchlists')
-          .select('id')
-          .eq('user_id', userId)
-          .eq('is_default', true)
-          .limit(1)
-          .maybeSingle();
+    const rows = ((watchlistRows ?? []) as WatchlistRow[]);
+    if (!rows.length) return [];
 
-        if (retryError) throw retryError;
-        if (!retryExisting?.id) throw insertError;
-        setDefaultWatchlistId(retryExisting.id);
-        return retryExisting.id;
-      }
-
-      setDefaultWatchlistId(inserted.id);
-      return inserted.id;
-    },
-    [defaultWatchlistId]
-  );
-
-  const loadRemoteSymbols = useCallback(async (watchlistId: string) => {
+    const watchlistIds = rows.map((row) => row.id);
     const { data: itemRows, error: itemError } = await supabase
       .from('watchlist_items')
-      .select('coin_id, created_at')
-      .eq('watchlist_id', watchlistId)
+      .select('watchlist_id, coin_id, created_at')
+      .in('watchlist_id', watchlistIds)
       .order('created_at', { ascending: false });
 
     if (itemError) throw itemError;
-    if (!itemRows?.length) return [];
 
-    const orderedCoinIds = itemRows.map((row) => row.coin_id);
+    const coinIds = Array.from(new Set(((itemRows ?? []) as Array<{ watchlist_id: string; coin_id: string }>).map((row) => row.coin_id).filter(Boolean)));
+    let symbolByCoinId = new Map<string, string>();
 
-    const { data: coinRows, error: coinError } = await supabase
-      .from('coins')
-      .select('id, symbol')
-      .in('id', orderedCoinIds);
+    if (coinIds.length) {
+      const { data: coinRows, error: coinError } = await supabase
+        .from('coins')
+        .select('id, symbol')
+        .in('id', coinIds);
 
-    if (coinError) throw coinError;
+      if (coinError) throw coinError;
+      symbolByCoinId = new Map((coinRows ?? []).map((row: any) => [row.id as string, normalizeSymbol(String(row.symbol ?? ''))]));
+    }
 
-    const symbolByCoinId = new Map((coinRows ?? []).map((row) => [row.id, normalizeSymbol(row.symbol)]));
-    return uniq(orderedCoinIds.map((coinId) => symbolByCoinId.get(coinId) ?? '').filter(Boolean));
+    const symbolsByWatchlistId = new Map<string, string[]>();
+    for (const row of (itemRows ?? []) as Array<{ watchlist_id: string; coin_id: string }>) {
+      const symbol = symbolByCoinId.get(row.coin_id);
+      if (!symbol) continue;
+      const current = symbolsByWatchlistId.get(row.watchlist_id) ?? [];
+      if (!current.includes(symbol)) current.push(symbol);
+      symbolsByWatchlistId.set(row.watchlist_id, current);
+    }
+
+    return rows.map<WatchlistSummary>((row) => ({
+      id: row.id,
+      name: row.name,
+      isDefault: row.is_default,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      symbols: symbolsByWatchlistId.get(row.id) ?? [],
+    }));
   }, []);
 
-  const addRemoteSymbol = useCallback(
-    async (watchlistId: string, symbol: string) => {
-      const coinId = await resolveCoinIdBySymbol(symbol);
-      if (!coinId) return;
-
-      const { error } = await supabase
-        .from('watchlist_items')
-        .upsert(
-          {
-            watchlist_id: watchlistId,
-            coin_id: coinId,
-          },
-          { onConflict: 'watchlist_id,coin_id' }
-        );
-
-      if (error) throw error;
-    },
-    []
-  );
-
-  const removeRemoteSymbol = useCallback(async (watchlistId: string, symbol: string) => {
-    const coinId = await resolveCoinIdBySymbol(symbol);
-    if (!coinId) return;
-
-    const { error } = await supabase
-      .from('watchlist_items')
-      .delete()
-      .eq('watchlist_id', watchlistId)
-      .eq('coin_id', coinId);
+  const ensureDefaultWatchlist = useCallback(async (userId: string) => {
+    const { data: existingRows, error } = await supabase
+      .from('watchlists')
+      .select('id, is_default, created_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: true });
 
     if (error) throw error;
+
+    const existing = (existingRows ?? []) as Array<{ id: string; is_default: boolean; created_at: string }>;
+    const currentDefault = existing.find((row) => row.is_default);
+    if (currentDefault?.id) {
+      setDefaultWatchlistId(currentDefault.id);
+      return currentDefault.id;
+    }
+
+    if (existing[0]?.id) {
+      const promotedAt = new Date().toISOString();
+      const { error: promoteError } = await supabase
+        .from('watchlists')
+        .update({ is_default: true, updated_at: promotedAt })
+        .eq('id', existing[0].id);
+
+      if (promoteError) throw promoteError;
+      setDefaultWatchlistId(existing[0].id);
+      return existing[0].id;
+    }
+
+    const { data: inserted, error: insertError } = await supabase
+      .from('watchlists')
+      .insert({
+        user_id: userId,
+        name: DEFAULT_WATCHLIST_NAME,
+        is_default: true,
+      })
+      .select('id')
+      .single();
+
+    if (insertError) throw insertError;
+    setDefaultWatchlistId(inserted.id);
+    return inserted.id as string;
   }, []);
 
-  const syncWithAccount = useCallback(
-    async (userId: string, localSymbols: string[]) => {
-      const watchlistId = await ensureDefaultWatchlist(userId);
-      const remoteSymbols = await loadRemoteSymbols(watchlistId);
-      const mergedSymbols = uniq([...localSymbols, ...remoteSymbols]);
-      const missingRemoteSymbols = mergedSymbols.filter((symbol) => !remoteSymbols.includes(symbol));
+  const syncWithAccount = useCallback(async (userId: string, localSymbols: string[]) => {
+    const defaultId = await ensureDefaultWatchlist(userId);
+    let remoteWatchlists = await loadRemoteWatchlists(userId);
+    const remoteSymbols = unionSymbolsFromWatchlists(remoteWatchlists);
+    const missingRemoteSymbols = uniq(localSymbols).filter((symbol) => !remoteSymbols.includes(symbol));
 
+    if (missingRemoteSymbols.length) {
       for (const symbol of missingRemoteSymbols) {
-        await addRemoteSymbol(watchlistId, symbol);
+        const coinId = await resolveCoinIdBySymbol(symbol);
+        if (!coinId) continue;
+        const { error } = await supabase
+          .from('watchlist_items')
+          .upsert({ watchlist_id: defaultId, coin_id: coinId }, { onConflict: 'watchlist_id,coin_id' });
+
+        if (error) throw error;
       }
 
-      return mergedSymbols;
-    },
-    [addRemoteSymbol, ensureDefaultWatchlist, loadRemoteSymbols]
-  );
+      await supabase
+        .from('watchlists')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('id', defaultId);
+
+      remoteWatchlists = await loadRemoteWatchlists(userId);
+    }
+
+    return remoteWatchlists;
+  }, [ensureDefaultWatchlist, loadRemoteWatchlists]);
 
   useEffect(() => {
     let active = true;
@@ -207,8 +294,7 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
     readLocalSymbols()
       .then((localSymbols) => {
         if (!active) return;
-        symbolsRef.current = localSymbols;
-        setSymbols(localSymbols);
+        setLocalGuestState(localSymbols);
       })
       .finally(() => {
         if (active) {
@@ -219,7 +305,7 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
     return () => {
       active = false;
     };
-  }, []);
+  }, [setLocalGuestState]);
 
   useEffect(() => {
     if (!bootstrapped || authLoading) return;
@@ -229,8 +315,8 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
     const sync = async () => {
       if (!user) {
         setMode('guest');
-        setDefaultWatchlistId(null);
         setSyncState('idle');
+        setLocalGuestState(symbolsRef.current);
         setLoading(false);
         return;
       }
@@ -239,9 +325,9 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
       setSyncState('syncing');
 
       try {
-        const syncedSymbols = await syncWithAccount(user.id, symbolsRef.current);
+        const syncedWatchlists = await syncWithAccount(user.id, symbolsRef.current);
         if (!active) return;
-        await persistLocalSymbols(syncedSymbols);
+        await applyRemoteWatchlists(syncedWatchlists);
         setSyncState('idle');
       } catch {
         if (!active) return;
@@ -258,82 +344,305 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
     return () => {
       active = false;
     };
-  }, [authLoading, bootstrapped, persistLocalSymbols, syncWithAccount, user]);
+  }, [applyRemoteWatchlists, authLoading, bootstrapped, setLocalGuestState, syncWithAccount, user]);
 
-  const syncRemoteMutation = useCallback(
-    async (symbol: string, action: 'add' | 'remove') => {
-      if (!user) return;
+  useEffect(() => {
+    if (user) return;
+    setPickerSymbol(null);
+    setPickerError(null);
+    setPickerDraftName('');
+    setPickerBusy(false);
+  }, [user]);
 
-      setMode('account');
-      setSyncState('syncing');
+  const setDefaultWatchlist = useCallback(async (watchlistId: string) => {
+    if (!user) return;
 
-      try {
-        const watchlistId = await ensureDefaultWatchlist(user.id);
-        if (action === 'add') {
-          await addRemoteSymbol(watchlistId, symbol);
-        } else {
-          await removeRemoteSymbol(watchlistId, symbol);
-        }
-        setSyncState('idle');
-      } catch {
-        setSyncState('error');
-      }
-    },
-    [addRemoteSymbol, ensureDefaultWatchlist, removeRemoteSymbol, user]
-  );
+    const current = watchlistsRef.current;
+    const existingDefault = current.find((watchlist) => watchlist.isDefault);
+    if (existingDefault?.id === watchlistId) return;
 
-  const saveCoin = useCallback(
-    async (symbol: string) => {
-      const normalized = normalizeSymbol(symbol);
-      if (!normalized) return;
+    if (existingDefault?.id) {
+      const { error: clearError } = await supabase
+        .from('watchlists')
+        .update({ is_default: false, updated_at: new Date().toISOString() })
+        .eq('id', existingDefault.id);
+
+      if (clearError) throw clearError;
+    }
+
+    const updatedAt = new Date().toISOString();
+    const { error: setError } = await supabase
+      .from('watchlists')
+      .update({ is_default: true, updated_at: updatedAt })
+      .eq('id', watchlistId);
+
+    if (setError) throw setError;
+
+    const next = current.map((watchlist) => ({
+      ...watchlist,
+      isDefault: watchlist.id === watchlistId,
+      updatedAt: watchlist.id === watchlistId ? updatedAt : watchlist.updatedAt,
+    }));
+    await applyRemoteWatchlists(next);
+  }, [applyRemoteWatchlists, user]);
+
+  const createWatchlist = useCallback(async (name: string) => {
+    if (!user) return null;
+
+    const trimmed = name.trim();
+    if (!trimmed) return null;
+
+    const isDefault = watchlistsRef.current.length === 0;
+    const { data, error } = await supabase
+      .from('watchlists')
+      .insert({
+        user_id: user.id,
+        name: trimmed,
+        is_default: isDefault,
+      })
+      .select('id, name, is_default, created_at, updated_at')
+      .single();
+
+    if (error) throw error;
+
+    const nextWatchlist: WatchlistSummary = {
+      id: data.id,
+      name: data.name,
+      isDefault: data.is_default,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+      symbols: [],
+    };
+
+    await applyRemoteWatchlists([...watchlistsRef.current, nextWatchlist]);
+    return nextWatchlist;
+  }, [applyRemoteWatchlists, user]);
+
+  const renameWatchlist = useCallback(async (watchlistId: string, name: string) => {
+    if (!user) return;
+
+    const trimmed = name.trim();
+    if (!trimmed) return;
+
+    const updatedAt = new Date().toISOString();
+    const { error } = await supabase
+      .from('watchlists')
+      .update({ name: trimmed, updated_at: updatedAt })
+      .eq('id', watchlistId);
+
+    if (error) throw error;
+
+    const next = watchlistsRef.current.map((watchlist) =>
+      watchlist.id === watchlistId ? { ...watchlist, name: trimmed, updatedAt } : watchlist
+    );
+    await applyRemoteWatchlists(next);
+  }, [applyRemoteWatchlists, user]);
+
+  const saveCoin = useCallback(async (symbol: string, watchlistId?: string) => {
+    const normalized = normalizeSymbol(symbol);
+    if (!normalized) return;
+
+    if (!user) {
       const nextSymbols = symbolsRef.current.includes(normalized)
         ? symbolsRef.current
         : [normalized, ...symbolsRef.current];
-      await persistLocalSymbols(nextSymbols);
-      await syncRemoteMutation(normalized, 'add');
+      await persistLocalUnion(nextSymbols);
+      setLocalGuestState(nextSymbols);
       await recordEvent({
         eventType: 'save_coin',
         entityType: 'watchlist',
         entityId: normalized,
         title: `Saved ${normalized}`,
-        subtitle: user ? 'Added to your synced watchlist' : 'Added to your local watchlist',
-        meta: { symbol: normalized, mode: user ? 'account' : 'guest' },
+        subtitle: 'Added to your local watchlist',
+        meta: { symbol: normalized, mode: 'guest' },
       });
-    },
-    [persistLocalSymbols, recordEvent, syncRemoteMutation, user]
-  );
+      return;
+    }
 
-  const removeCoin = useCallback(
-    async (symbol: string) => {
-      const normalized = normalizeSymbol(symbol);
-      if (!normalized) return;
+    const targetWatchlistId = watchlistId ?? defaultWatchlistId ?? await ensureDefaultWatchlist(user.id);
+    const coinId = await resolveCoinIdBySymbol(normalized);
+    if (!coinId) return;
+
+    const { error } = await supabase
+      .from('watchlist_items')
+      .upsert({ watchlist_id: targetWatchlistId, coin_id: coinId }, { onConflict: 'watchlist_id,coin_id' });
+
+    if (error) throw error;
+
+    const updatedAt = new Date().toISOString();
+    await supabase.from('watchlists').update({ updated_at: updatedAt }).eq('id', targetWatchlistId);
+
+    const existing = watchlistsRef.current;
+    const next = existing.map((watchlist) =>
+      watchlist.id === targetWatchlistId
+        ? { ...watchlist, updatedAt, symbols: uniq([normalized, ...watchlist.symbols]) }
+        : watchlist
+    );
+
+    if (next.some((watchlist) => watchlist.id === targetWatchlistId)) {
+      await applyRemoteWatchlists(next);
+    } else {
+      const refreshed = await loadRemoteWatchlists(user.id);
+      await applyRemoteWatchlists(refreshed);
+    }
+
+    await recordEvent({
+      eventType: 'save_coin',
+      entityType: 'watchlist',
+      entityId: normalized,
+      title: `Saved ${normalized}`,
+      subtitle: 'Added to your synced watchlist',
+      meta: { symbol: normalized, mode: 'account', watchlistId: targetWatchlistId },
+    });
+  }, [applyRemoteWatchlists, defaultWatchlistId, ensureDefaultWatchlist, loadRemoteWatchlists, persistLocalUnion, recordEvent, setLocalGuestState, user]);
+
+  const removeCoin = useCallback(async (symbol: string, watchlistId?: string) => {
+    const normalized = normalizeSymbol(symbol);
+    if (!normalized) return;
+
+    if (!user) {
       const nextSymbols = symbolsRef.current.filter((item) => item !== normalized);
-      await persistLocalSymbols(nextSymbols);
-      await syncRemoteMutation(normalized, 'remove');
+      await persistLocalUnion(nextSymbols);
+      setLocalGuestState(nextSymbols);
       await recordEvent({
         eventType: 'unsave_coin',
         entityType: 'watchlist',
         entityId: normalized,
         title: `Removed ${normalized}`,
-        subtitle: user ? 'Removed from your synced watchlist' : 'Removed from your local watchlist',
-        meta: { symbol: normalized, mode: user ? 'account' : 'guest' },
+        subtitle: 'Removed from your local watchlist',
+        meta: { symbol: normalized, mode: 'guest' },
       });
-    },
-    [persistLocalSymbols, recordEvent, syncRemoteMutation, user]
-  );
+      return;
+    }
 
-  const toggleSaved = useCallback(
-    async (symbol: string) => {
-      const normalized = normalizeSymbol(symbol);
-      if (!normalized) return;
+    const coinId = await resolveCoinIdBySymbol(normalized);
+    if (!coinId) return;
+
+    const targetIds = watchlistId
+      ? [watchlistId]
+      : watchlistsRef.current.filter((watchlist) => watchlist.symbols.includes(normalized)).map((watchlist) => watchlist.id);
+
+    for (const targetId of targetIds) {
+      const { error } = await supabase
+        .from('watchlist_items')
+        .delete()
+        .eq('watchlist_id', targetId)
+        .eq('coin_id', coinId);
+
+      if (error) throw error;
+
+      await supabase.from('watchlists').update({ updated_at: new Date().toISOString() }).eq('id', targetId);
+    }
+
+    const next = watchlistsRef.current.map((watchlist) =>
+      targetIds.includes(watchlist.id)
+        ? { ...watchlist, updatedAt: new Date().toISOString(), symbols: watchlist.symbols.filter((item) => item !== normalized) }
+        : watchlist
+    );
+    await applyRemoteWatchlists(next);
+
+    await recordEvent({
+      eventType: 'unsave_coin',
+      entityType: 'watchlist',
+      entityId: normalized,
+      title: `Removed ${normalized}`,
+      subtitle: 'Removed from your synced watchlist',
+      meta: { symbol: normalized, mode: 'account', watchlistIds: targetIds },
+    });
+  }, [applyRemoteWatchlists, persistLocalUnion, recordEvent, setLocalGuestState, user]);
+
+  const deleteWatchlist = useCallback(async (watchlistId: string) => {
+    if (!user) return;
+
+    const current = watchlistsRef.current;
+    const target = current.find((watchlist) => watchlist.id === watchlistId);
+    if (!target) return;
+    if (current.length <= 1) {
+      throw new Error('Keep at least one watchlist.');
+    }
+
+    if (target.isDefault) {
+      const replacement = current.find((watchlist) => watchlist.id !== watchlistId);
+      if (replacement?.id) {
+        await setDefaultWatchlist(replacement.id);
+      }
+    }
+
+    const { error: itemsError } = await supabase
+      .from('watchlist_items')
+      .delete()
+      .eq('watchlist_id', watchlistId);
+
+    if (itemsError) throw itemsError;
+
+    const { error } = await supabase
+      .from('watchlists')
+      .delete()
+      .eq('id', watchlistId);
+
+    if (error) throw error;
+
+    const next = watchlistsRef.current.filter((watchlist) => watchlist.id !== watchlistId);
+    await applyRemoteWatchlists(next);
+  }, [applyRemoteWatchlists, setDefaultWatchlist, user]);
+
+  const getWatchlistsForSymbol = useCallback((symbol: string) => {
+    const normalized = normalizeSymbol(symbol);
+    if (!normalized) return [];
+    return watchlists.filter((watchlist) => watchlist.symbols.includes(normalized));
+  }, [watchlists]);
+
+  const isSaved = useCallback((symbol: string, watchlistId?: string) => {
+    const normalized = normalizeSymbol(symbol);
+    if (!normalized) return false;
+
+    if (watchlistId) {
+      return watchlists.some((watchlist) => watchlist.id === watchlistId && watchlist.symbols.includes(normalized));
+    }
+
+    return symbols.includes(normalized);
+  }, [symbols, watchlists]);
+
+  const openSavePicker = useCallback((symbol: string) => {
+    const normalized = normalizeSymbol(symbol);
+    if (!normalized || !user) return;
+    setPickerSymbol(normalized);
+    setPickerError(null);
+    setPickerDraftName('');
+  }, [user]);
+
+  const closeSavePicker = useCallback(() => {
+    setPickerSymbol(null);
+    setPickerBusy(false);
+    setPickerError(null);
+    setPickerDraftName('');
+  }, []);
+
+  const toggleSaved = useCallback(async (symbol: string) => {
+    const normalized = normalizeSymbol(symbol);
+    if (!normalized) return;
+
+    if (!user) {
       if (symbolsRef.current.includes(normalized)) {
         await removeCoin(normalized);
       } else {
         await saveCoin(normalized);
       }
-    },
-    [removeCoin, saveCoin]
-  );
+      return;
+    }
+
+    if (watchlistsRef.current.length > 1) {
+      openSavePicker(normalized);
+      return;
+    }
+
+    const onlyWatchlistId = watchlistsRef.current[0]?.id ?? defaultWatchlistId ?? await ensureDefaultWatchlist(user.id);
+    if (isSaved(normalized, onlyWatchlistId)) {
+      await removeCoin(normalized, onlyWatchlistId);
+    } else {
+      await saveCoin(normalized, onlyWatchlistId);
+    }
+  }, [defaultWatchlistId, ensureDefaultWatchlist, isSaved, openSavePicker, removeCoin, saveCoin, user]);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -343,39 +652,184 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
       if (!user) {
         setMode('guest');
         setSyncState('idle');
-        await persistLocalSymbols(localSymbols);
+        setLocalGuestState(localSymbols);
         return;
       }
 
       setMode('account');
       setSyncState('syncing');
-      const syncedSymbols = await syncWithAccount(user.id, localSymbols);
-      await persistLocalSymbols(syncedSymbols);
+      const syncedWatchlists = await syncWithAccount(user.id, localSymbols);
+      await applyRemoteWatchlists(syncedWatchlists);
       setSyncState('idle');
     } catch {
       setSyncState('error');
     } finally {
       setLoading(false);
     }
-  }, [persistLocalSymbols, syncWithAccount, user]);
+  }, [applyRemoteWatchlists, setLocalGuestState, syncWithAccount, user]);
 
-  const value = useMemo<WatchlistContextValue>(() => {
-    const isSaved = (symbol: string) => symbols.includes(normalizeSymbol(symbol));
+  const handlePickerToggleWatchlist = useCallback(async (watchlistId: string) => {
+    if (!pickerSymbol || pickerBusy) return;
 
-    return {
-      symbols,
-      loading,
-      mode,
-      syncState,
-      isSaved,
-      saveCoin,
-      removeCoin,
-      toggleSaved,
-      reload,
-    };
-  }, [loading, mode, reload, removeCoin, saveCoin, symbols, syncState, toggleSaved]);
+    setPickerBusy(true);
+    setPickerError(null);
 
-  return <WatchlistContext.Provider value={value}>{children}</WatchlistContext.Provider>;
+    try {
+      if (isSaved(pickerSymbol, watchlistId)) {
+        await removeCoin(pickerSymbol, watchlistId);
+      } else {
+        await saveCoin(pickerSymbol, watchlistId);
+      }
+    } catch (err: any) {
+      setPickerError(err?.message ?? 'Could not update watchlists.');
+    } finally {
+      setPickerBusy(false);
+    }
+  }, [isSaved, pickerBusy, pickerSymbol, removeCoin, saveCoin]);
+
+  const handlePickerCreateWatchlist = useCallback(async () => {
+    if (!pickerSymbol || pickerBusy) return;
+    const trimmed = pickerDraftName.trim();
+    if (!trimmed) return;
+
+    setPickerBusy(true);
+    setPickerError(null);
+
+    try {
+      const created = await createWatchlist(trimmed);
+      if (created?.id) {
+        await saveCoin(pickerSymbol, created.id);
+      }
+      setPickerDraftName('');
+    } catch (err: any) {
+      setPickerError(err?.message ?? 'Could not create watchlist.');
+    } finally {
+      setPickerBusy(false);
+    }
+  }, [createWatchlist, pickerBusy, pickerDraftName, pickerSymbol, saveCoin]);
+
+  const value = useMemo<WatchlistContextValue>(() => ({
+    symbols,
+    loading,
+    mode,
+    syncState,
+    watchlists,
+    defaultWatchlistId,
+    isSaved,
+    getWatchlistsForSymbol,
+    saveCoin,
+    removeCoin,
+    toggleSaved,
+    reload,
+    createWatchlist,
+    renameWatchlist,
+    deleteWatchlist,
+    openSavePicker,
+    closeSavePicker,
+  }), [
+    closeSavePicker,
+    createWatchlist,
+    defaultWatchlistId,
+    deleteWatchlist,
+    getWatchlistsForSymbol,
+    isSaved,
+    loading,
+    mode,
+    openSavePicker,
+    reload,
+    removeCoin,
+    renameWatchlist,
+    saveCoin,
+    symbols,
+    syncState,
+    toggleSaved,
+    watchlists,
+  ]);
+
+  return (
+    <>
+      <WatchlistContext.Provider value={value}>{children}</WatchlistContext.Provider>
+
+      <Modal animationType="slide" transparent visible={Boolean(pickerSymbol && user)} onRequestClose={closeSavePicker}>
+        <Pressable style={styles.backdrop} onPress={closeSavePicker} />
+        <View style={[styles.sheet, { backgroundColor: colors.surface }]}> 
+          <View style={[styles.sheetHandle, { backgroundColor: colors.border }]} />
+          <ThemedText type="defaultSemiBold" style={{ color: colors.text, fontSize: 18 }}>
+            Save {pickerSymbol ? `${pickerSymbol}` : 'coin'}
+          </ThemedText>
+          <ThemedText style={{ color: colors.textSecondary, marginTop: 6, lineHeight: 20 }}>
+            Choose one or more watchlists. A coin can belong to multiple lists.
+          </ThemedText>
+
+          <View style={styles.sheetList}>
+            {watchlists.map((watchlist) => {
+              const selected = pickerSymbol ? isSaved(pickerSymbol, watchlist.id) : false;
+              return (
+                <TouchableOpacity
+                  key={watchlist.id}
+                  style={[styles.sheetRow, { borderColor: colors.border, backgroundColor: colors.surfaceElevated }]}
+                  onPress={() => handlePickerToggleWatchlist(watchlist.id)}
+                  disabled={pickerBusy}
+                >
+                  <View style={{ flex: 1 }}>
+                    <View style={styles.sheetRowTitle}>
+                      <ThemedText style={{ color: colors.text, fontWeight: '700' }}>{watchlist.name}</ThemedText>
+                      {watchlist.isDefault ? (
+                        <View style={[styles.defaultBadge, { backgroundColor: colors.surface, borderColor: colors.border }]}> 
+                          <ThemedText style={{ color: colors.textSecondary, fontSize: 10, fontWeight: '700' }}>Default</ThemedText>
+                        </View>
+                      ) : null}
+                    </View>
+                    <ThemedText style={{ color: colors.textSecondary, fontSize: 12, marginTop: 4 }}>
+                      {watchlist.symbols.length} coin{watchlist.symbols.length === 1 ? '' : 's'}
+                    </ThemedText>
+                  </View>
+                  <IconSymbol
+                    name={selected ? 'checkmark.circle.fill' : 'circle'}
+                    size={20}
+                    color={selected ? colors.primary : colors.textTertiary}
+                  />
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          <View style={[styles.createCard, { borderColor: colors.border, backgroundColor: colors.surfaceElevated }]}> 
+            <ThemedText style={{ color: colors.text, fontWeight: '700', marginBottom: 8 }}>Create watchlist</ThemedText>
+            <TextInput
+              value={pickerDraftName}
+              onChangeText={setPickerDraftName}
+              placeholder="New watchlist name"
+              placeholderTextColor={colors.textTertiary}
+              style={[
+                styles.input,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                  color: colors.text,
+                },
+              ]}
+            />
+            <TouchableOpacity
+              style={[styles.createButton, { backgroundColor: colors.primary, opacity: pickerBusy ? 0.7 : 1 }]}
+              disabled={pickerBusy}
+              onPress={handlePickerCreateWatchlist}
+            >
+              <ThemedText style={{ color: colors.primaryText, fontWeight: '700' }}>Create and save</ThemedText>
+            </TouchableOpacity>
+          </View>
+
+          {pickerError ? (
+            <ThemedText style={{ color: colors.danger, marginTop: 10 }}>{pickerError}</ThemedText>
+          ) : null}
+
+          <TouchableOpacity style={[styles.doneButton, { borderColor: colors.border }]} onPress={closeSavePicker}>
+            <ThemedText style={{ color: colors.text, fontWeight: '700' }}>{t('Done') || 'Done'}</ThemedText>
+          </TouchableOpacity>
+        </View>
+      </Modal>
+    </>
+  );
 }
 
 export function useWatchlist() {
@@ -385,3 +839,84 @@ export function useWatchlist() {
   }
   return context;
 }
+
+const styles = StyleSheet.create({
+  backdrop: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
+  },
+  sheet: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    padding: 16,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    gap: 12,
+  },
+  sheetHandle: {
+    width: 42,
+    height: 4,
+    borderRadius: 999,
+    alignSelf: 'center',
+    marginBottom: 4,
+  },
+  sheetList: {
+    gap: 10,
+    marginTop: 2,
+  },
+  sheetRow: {
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  sheetRowTitle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  defaultBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  createCard: {
+    marginTop: 2,
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 14,
+    gap: 10,
+  },
+  input: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+  },
+  createButton: {
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+  },
+  doneButton: {
+    marginTop: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+  },
+});

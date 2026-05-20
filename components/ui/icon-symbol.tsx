@@ -19,6 +19,7 @@ const MAPPING = {
   'paperplane.fill': 'send',
   'line.3.horizontal.decrease.circle': 'filter-list',
   'bookmark.fill': 'bookmark',
+  'bookmark': 'bookmark-border',
   'ellipsis.circle': 'more-horiz',
   
   // Common icons
@@ -45,6 +46,7 @@ const MAPPING = {
   'heart.fill': 'favorite',
   'bubble.left': 'chat-bubble-outline',
   'text.bubble.fill': 'chat-bubble',
+  'bookmark.slash': 'bookmark-remove',
   'arrow.2.squarepath': 'repeat',
   'square.and.arrow.up': 'share',
   'moon.fill': 'nightlight',

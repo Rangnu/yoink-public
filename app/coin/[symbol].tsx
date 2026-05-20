@@ -197,7 +197,7 @@ export default function CoinDetailScreen() {
           style={[styles.iconButton, { backgroundColor: colors.surfaceElevated }]}
           disabled={!symbol}
         >
-          <IconSymbol name={saved ? 'bookmark.fill' : 'bookmark'} size={18} color={saved ? colors.primary : colors.text} />
+          <IconSymbol name={saved ? 'bookmark.fill' : 'bookmark'} size={18} color={saved ? colors.primary : colors.textTertiary} />
         </TouchableOpacity>
       </View>
 

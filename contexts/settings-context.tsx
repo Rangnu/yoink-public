@@ -2982,7 +2982,7 @@ const rawDictionary: Record<string, Partial<Record<AppLanguage, string>>> = {
   PlaceholderSettingsTitle: { en: 'Choose a setting to edit', pl: 'Wybierz ustawienie do edycji' },
   PlaceholderSettingsBullet1: { en: 'Appearance controls for light, dark, and system theme', pl: 'Sterowanie wyglądem dla motywu jasnego, ciemnego i systemowego' },
   PlaceholderSettingsBullet2: { en: 'Language, currency, and notification preferences', pl: 'Preferencje języka, waluty i powiadomień' },
-  PlaceholderSettingsBullet3: { en: 'Subscription and account-level options as they become available', pl: 'Opcje subskrypcji i konta, gdy staną się dostępne' },
+  PlaceholderSettingsBullet3: { en: 'Account-level options as they become available', pl: 'Opcje konta, gdy staną się dostępne' },
   PlaceholderNotificationsTitle: { en: 'Notification preferences', pl: 'Preferencje powiadomień' },
   PlaceholderNotificationsBullet1: { en: 'Price movement and momentum alerts', pl: 'Alerty o ruchach cen i momentum' },
   PlaceholderNotificationsBullet2: { en: 'Watchlist and scouter notifications', pl: 'Powiadomienia watchlist i zwiadowców' },

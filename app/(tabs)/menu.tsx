@@ -152,19 +152,7 @@ export default function MenuScreen() {
           <MenuRow icon="paintbrush.fill" label={t('Appearance')} onPress={() => router.push('/settings/appearance')} colors={colors} />
           <MenuRow icon="globe" label={t('Language')} onPress={() => router.push('/settings/language')} colors={colors} divider colorsObj={colors} />
           <MenuRow icon="dollarsign.circle" label={t('Currency')} onPress={() => router.push('/settings/currency')} colors={colors} divider colorsObj={colors} />
-          <MenuRow icon="bell.fill" label={t('Notifications')} onPress={() => router.push('/settings/notifications')} colors={colors} divider colorsObj={colors} />
-          <MenuRow
-            icon="creditcard"
-            label={t('Subscription')}
-            onPress={() => {
-              if (!user) {
-                pushLogin('/settings/subscription');
-              } else {
-                router.push('/settings/subscription');
-              }
-            }}
-            colors={colors}
-          />
+          <MenuRow icon="bell.fill" label={t('Notifications')} onPress={() => router.push('/settings/notifications')} colors={colors} />
         </Section>
 
         <Section title={t('ExploreTrack')} icon="chart.line.uptrend.xyaxis" colors={colors}>

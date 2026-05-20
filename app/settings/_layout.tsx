@@ -19,7 +19,6 @@ export default function SettingsLayout() {
       <Stack.Screen name="appearance" options={{ title: t('Appearance') }} />
       <Stack.Screen name="language" options={{ title: t('Language') }} />
       <Stack.Screen name="currency" options={{ title: t('Currency') }} />
-      <Stack.Screen name="subscription" options={{ title: t('Subscription') }} />
       <Stack.Screen name="notifications" options={{ title: t('Notifications') }} />
     </Stack>
   );

@@ -1,6 +1,6 @@
 import { ThemedText } from '@/components/themed-text';
+import { CoinSparkline } from '@/components/ui/coin-sparkline';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { MarketRowCard } from '@/components/ui/market-row-card';
 import { useSettings } from '@/contexts/settings-context';
 import { useTheme } from '@/contexts/theme-context';
 import { supabase } from '@/utils/supabase';
@@ -400,27 +400,17 @@ export default function HomeScreen() {
         {/* First 5 stocks as direct children (so sticky block releases after them) */}
         {current.slice(0, 5).map((stock, idx) => {
           const visible = showAll || idx < 3;
-          const isPositive = parseFloat(stock.change) >= 0;
           return (
-            <View
+            <HomeHighlightRow
               key={`${tab}-${stock.symbol}-first`}
-            >
-              <MarketRowCard
-                badgeText={String(idx + 1).padStart(2, '0')}
-                coinId={stock.coinId}
-                symbol={stock.symbol}
-                name={stock.name}
-                priceLabel={`$${stock.price}`}
-                changeLabel={`${isPositive ? '+' : ''}${stock.change}%`}
-                secondaryChangeLabel={formatDollarMove(stock.changeValue)}
-                metricLabel={stock.rank != null ? 'Mkt rank' : undefined}
-                metricValue={stock.rank != null ? `#${stock.rank}` : undefined}
-                chartRange={tab === 'yoink' ? '1H' : '24H'}
-                dimmed={!visible}
-                disabled={!visible}
-                onPress={visible ? () => router.push({ pathname: '/coin/[symbol]' as any, params: { symbol: stock.symbol } }) : undefined}
-              />
-            </View>
+              index={idx + 1}
+              stock={stock}
+              visible={visible}
+              chartRange={tab === 'yoink' ? '1H' : '24H'}
+              onPress={visible ? () => router.push({ pathname: '/coin/[symbol]' as any, params: { symbol: stock.symbol } }) : undefined}
+              formatDollarMove={formatDollarMove}
+              colors={colors}
+            />
           );
         })}
 
@@ -432,27 +422,17 @@ export default function HomeScreen() {
           {current.slice(5).map((stock, idx) => {
             const originalIndex = 5 + idx;
             const visible = showAll || originalIndex < 3;
-            const isPositive = parseFloat(stock.change) >= 0;
             return (
-              <View
+              <HomeHighlightRow
                 key={`${tab}-${stock.symbol}-rest`}
-              >
-                <MarketRowCard
-                  badgeText={String(originalIndex + 1).padStart(2, '0')}
-                  coinId={stock.coinId}
-                  symbol={stock.symbol}
-                  name={stock.name}
-                  priceLabel={`$${stock.price}`}
-                  changeLabel={`${isPositive ? '+' : ''}${stock.change}%`}
-                  secondaryChangeLabel={formatDollarMove(stock.changeValue)}
-                  metricLabel={stock.rank != null ? 'Mkt rank' : undefined}
-                  metricValue={stock.rank != null ? `#${stock.rank}` : undefined}
-                  chartRange={tab === 'yoink' ? '1H' : '24H'}
-                  dimmed={!visible}
-                  disabled={!visible}
-                  onPress={visible ? () => router.push({ pathname: '/coin/[symbol]' as any, params: { symbol: stock.symbol } }) : undefined}
-                />
-              </View>
+                index={originalIndex + 1}
+                stock={stock}
+                visible={visible}
+                chartRange={tab === 'yoink' ? '1H' : '24H'}
+                onPress={visible ? () => router.push({ pathname: '/coin/[symbol]' as any, params: { symbol: stock.symbol } }) : undefined}
+                formatDollarMove={formatDollarMove}
+                colors={colors}
+              />
             );
           })}
 
@@ -600,34 +580,62 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingVertical: 6,
+    paddingVertical: 10,
     borderBottomWidth: 0.5,
+  },
+  rowBadgeWrap: {
+    width: 42,
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  rowBadgeCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   symbolSection: {
     flex: 1,
     justifyContent: 'center',
   },
+  rowTextStack: {
+    minWidth: 0,
+  },
+  homeMetricPill: {
+    alignSelf: 'flex-start',
+    marginTop: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
   chartSection: {
-    width: 44,
+    width: 92,
     alignItems: 'center',
     justifyContent: 'center',
-    marginHorizontal: 6,
+    marginHorizontal: 12,
   },
   priceSection: {
     alignItems: 'flex-end',
-    minWidth: 88,
+    minWidth: 90,
   },
   priceBox: {
-    paddingHorizontal: 6,
-    paddingVertical: 4,
-    borderRadius: 6,
-    minWidth: 68,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    minWidth: 76,
     alignItems: 'center',
   },
-  changeInfo: {
-    flexDirection: 'row',
-    marginTop: 2,
+  changeInfoColumn: {
+    marginTop: 6,
     justifyContent: 'flex-end',
+    alignItems: 'flex-end',
   },
   centeredUnlockBtn: {
     flexDirection: 'row',
@@ -676,6 +684,107 @@ const styles = StyleSheet.create({
 });
 
 type SegmentProps = { label: string; active?: boolean; onPress?: () => void; colors: any; isYoink?: boolean; isFomo?: boolean; isBalanced?: boolean };
+
+function HomeHighlightRow({
+  stock,
+  index,
+  visible,
+  chartRange,
+  onPress,
+  formatDollarMove,
+  colors,
+}: {
+  stock: {
+    coinId?: string;
+    symbol: string;
+    name: string;
+    price: string;
+    change: string;
+    changeValue: string;
+    rank?: number | null;
+  };
+  index: number;
+  visible: boolean;
+  chartRange: '1H' | '24H';
+  onPress?: () => void;
+  formatDollarMove: (value: string) => string;
+  colors: any;
+}) {
+  const isPositive = parseFloat(stock.change) >= 0;
+  const changeColor = isPositive ? colors.success : colors.danger;
+
+  return (
+    <TouchableOpacity
+      activeOpacity={0.9}
+      disabled={!visible}
+      onPress={onPress}
+      style={[
+        styles.watchlistRow,
+        { backgroundColor: colors.background, borderBottomColor: colors.border, opacity: visible ? 1 : 0.58 },
+      ]}>
+      <View style={styles.rowBadgeWrap}>
+        <View style={[styles.rowBadgeCircle, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+          <ThemedText style={{ color: colors.textSecondary, fontSize: 11, fontWeight: '700' }}>
+            {String(index).padStart(2, '0')}
+          </ThemedText>
+        </View>
+      </View>
+
+      <View style={styles.symbolSection}>
+        <View style={styles.rowTextStack}>
+          <ThemedText style={{ color: colors.text, fontWeight: '700', fontSize: 15 }}>
+            {stock.symbol}
+          </ThemedText>
+          <ThemedText style={{ color: colors.textSecondary, fontSize: 12, marginTop: 2 }} numberOfLines={1}>
+            {stock.name}
+          </ThemedText>
+        </View>
+        {stock.rank != null ? (
+          <View style={[styles.homeMetricPill, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+            <ThemedText style={{ color: colors.textTertiary, fontSize: 10, fontWeight: '700' }}>
+              MKT RANK
+            </ThemedText>
+            <ThemedText style={{ color: colors.textSecondary, fontSize: 10, fontWeight: '700' }}>
+              #{stock.rank}
+            </ThemedText>
+          </View>
+        ) : null}
+      </View>
+
+      <View style={[styles.chartSection, !visible && { opacity: 0.3 }]}>
+        <CoinSparkline
+          coinId={stock.coinId}
+          symbol={stock.symbol}
+          color={changeColor}
+          width={92}
+          height={32}
+          range={chartRange}
+          historyLimit={400}
+        />
+      </View>
+
+      <View style={styles.priceSection}>
+        <View style={[styles.priceBox, { backgroundColor: changeColor }]}>
+          <ThemedText style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 13 }}>
+            ${stock.price}
+          </ThemedText>
+        </View>
+        {visible ? (
+          <View style={styles.changeInfoColumn}>
+            <ThemedText style={{ color: changeColor, fontWeight: '600', fontSize: 10 }}>
+              {formatDollarMove(stock.changeValue)}
+            </ThemedText>
+            <ThemedText style={{ color: changeColor, fontWeight: '600', fontSize: 10, marginTop: 2 }}>
+              {isPositive ? '+' : ''}
+              {stock.change}%
+            </ThemedText>
+          </View>
+        ) : null}
+      </View>
+    </TouchableOpacity>
+  );
+}
+
 function SegmentButton({ label, active, onPress, colors, isYoink, isFomo, isBalanced }: SegmentProps) {
   // Special styling for each button type when not active
   const yoinkInactiveStyle = isYoink && !active ? {

@@ -1,7 +1,7 @@
 import { ThemedText } from '@/components/themed-text';
 import { BitcoinIcon } from '@/components/ui/bitcoin-icon';
+import { CoinSparkline } from '@/components/ui/coin-sparkline';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { MarketRowCard } from '@/components/ui/market-row-card';
 import { useSettings } from '@/contexts/settings-context';
 import { useTheme } from '@/contexts/theme-context';
 import { useWatchlist } from '@/contexts/watchlist-context';
@@ -230,8 +230,8 @@ export default function ExploreScreen() {
                 <ThemedText style={{ color: colors.text, fontWeight: '700' }}>
                   Live market board
                 </ThemedText>
-                <ThemedText style={{ color: colors.textSecondary, fontSize: 12, marginTop: 4 }}>
-                  Open any coin for the interactive chart and whale snapshot.
+                <ThemedText style={{ color: colors.textSecondary, fontSize: 12, marginTop: 2 }}>
+                  Tap any coin for details.
                 </ThemedText>
               </View>
               <View style={[styles.liveBadge, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
@@ -244,9 +244,9 @@ export default function ExploreScreen() {
             {stockLists[stocksTab].map((row, i) => {
             const saved = isSaved(row.s);
             return (
-              <MarketRowCard
+              <ExploreMarketRow
                 key={row.s}
-                badgeText={String(i + 1).padStart(2, '0')}
+                index={i + 1}
                 coinId={row.coinId}
                 symbol={row.s}
                 name={row.name}
@@ -257,6 +257,7 @@ export default function ExploreScreen() {
                 saved={saved}
                 onPress={() => router.push({ pathname: '/coin/[symbol]' as any, params: { symbol: row.s } })}
                 onToggleSaved={() => toggleSaved(row.s)}
+                colors={colors}
               />
             )})}
           </View>
@@ -294,6 +295,106 @@ function CategoryButton({ colors, emoji, icon, label, renderIcon }: { colors: an
         <IconSymbol name={icon as any} size={20} color={colors.text} />
       )}
       <ThemedText style={{ color: colors.text, fontSize: 12, fontWeight: '600' }}>{label}</ThemedText>
+    </TouchableOpacity>
+  );
+}
+
+function ExploreMarketRow({
+  index,
+  coinId,
+  symbol,
+  name,
+  priceLabel,
+  changeLabel,
+  metricLabel,
+  metricValue,
+  saved,
+  onPress,
+  onToggleSaved,
+  colors,
+}: {
+  index: number;
+  coinId?: string;
+  symbol: string;
+  name: string;
+  priceLabel: string;
+  changeLabel: string;
+  metricLabel?: string;
+  metricValue?: string;
+  saved: boolean;
+  onPress?: () => void;
+  onToggleSaved?: () => void;
+  colors: any;
+}) {
+  const isPositive = !changeLabel.trim().startsWith('-');
+  const changeColor = isPositive ? colors.success : colors.danger;
+
+  return (
+    <TouchableOpacity
+      activeOpacity={0.9}
+      onPress={onPress}
+      style={[styles.marketRow, { borderBottomColor: colors.border }]}
+    >
+      <View style={styles.marketRowBadgeWrap}>
+        <View style={[styles.marketRowBadgeCircle, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+          <ThemedText style={{ color: colors.textSecondary, fontSize: 10, fontWeight: '700' }}>
+            {String(index).padStart(2, '0')}
+          </ThemedText>
+        </View>
+      </View>
+
+      <View style={styles.marketRowMain}>
+        <View style={styles.marketRowTextStack}>
+          <ThemedText style={{ color: colors.text, fontWeight: '700', fontSize: 14 }}>
+            {symbol}
+          </ThemedText>
+          <ThemedText style={{ color: colors.textSecondary, fontSize: 12, marginTop: 1 }} numberOfLines={1}>
+            {name}
+          </ThemedText>
+        </View>
+
+        {metricLabel && metricValue ? (
+          <View style={[styles.marketMetricPill, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+            <ThemedText style={{ color: colors.textTertiary, fontSize: 9, fontWeight: '700' }}>
+              {metricLabel.toUpperCase()}
+            </ThemedText>
+            <ThemedText style={{ color: colors.textSecondary, fontSize: 10, fontWeight: '700' }}>
+              {metricValue}
+            </ThemedText>
+          </View>
+        ) : null}
+      </View>
+
+      <View style={styles.marketRowChart}>
+        <CoinSparkline
+          coinId={coinId}
+          symbol={symbol}
+          color={changeColor}
+          width={78}
+          height={26}
+          range="24H"
+          historyLimit={400}
+        />
+      </View>
+
+      <View style={styles.marketRowPriceSection}>
+        <View style={[styles.marketPricePill, { backgroundColor: changeColor }]}>
+          <ThemedText style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 13 }}>
+            {priceLabel}
+          </ThemedText>
+        </View>
+        <ThemedText style={{ color: changeColor, fontSize: 10, fontWeight: '600', marginTop: 5 }}>
+          {changeLabel}
+        </ThemedText>
+      </View>
+
+      <TouchableOpacity
+        accessibilityLabel={saved ? `Remove ${symbol} from saved` : `Save ${symbol}`}
+        onPress={onToggleSaved}
+        style={[styles.marketSaveButton, { borderColor: colors.border, backgroundColor: colors.surface }]}
+      >
+        <IconSymbol name={saved ? 'bookmark.fill' : 'bookmark'} size={16} color={saved ? colors.primary : colors.textSecondary} />
+      </TouchableOpacity>
     </TouchableOpacity>
   );
 }
@@ -380,9 +481,72 @@ const styles = StyleSheet.create({
   inlineTabsRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 14, paddingTop: 6, paddingBottom: 6 },
   inlineTabItem: { alignItems: 'center' },
   inlineTabUnderline: { height: 2, borderRadius: 1, alignSelf: 'stretch', marginTop: 4 },
-  liveBoardCard: { borderWidth: 1, borderRadius: 18, padding: 12 },
-  liveBoardHeader: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, marginBottom: 12 },
-  liveBadge: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6, alignSelf: 'flex-start' },
+  liveBoardCard: { borderWidth: 0, borderRadius: 0, padding: 0, backgroundColor: 'transparent' },
+  liveBoardHeader: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, marginBottom: 10, paddingHorizontal: 2 },
+  liveBadge: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 5, alignSelf: 'flex-start' },
+  marketRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  marketRowBadgeWrap: {
+    width: 38,
+    marginRight: 10,
+    alignItems: 'flex-start',
+  },
+  marketRowBadgeCircle: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  marketRowMain: {
+    flex: 1,
+    minWidth: 0,
+  },
+  marketRowTextStack: {
+    minWidth: 0,
+  },
+  marketMetricPill: {
+    alignSelf: 'flex-start',
+    marginTop: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  marketRowChart: {
+    width: 78,
+    marginHorizontal: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  marketRowPriceSection: {
+    alignItems: 'flex-end',
+    minWidth: 80,
+  },
+  marketPricePill: {
+    minWidth: 72,
+    alignItems: 'center',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  marketSaveButton: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    borderWidth: 1,
+    marginLeft: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   moreBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 12, alignSelf: 'center' },
   infoCard: { borderRadius: 12, borderWidth: 1, padding: 14 },
   tickerRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },

@@ -240,7 +240,7 @@ export default function AdminScreen() {
       <SafeAreaView edges={['left', 'right']} style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.centerState}>
           <ActivityIndicator color={colors.primary} />
-          <ThemedText style={{ color: colors.textSecondary, marginTop: 12 }}>Checking admin access…</ThemedText>
+          <ThemedText style={{ color: colors.textSecondary, marginTop: 12 }}>{t('AdminCheckingAccess')}</ThemedText>
         </View>
       </SafeAreaView>
     );
@@ -269,7 +269,7 @@ export default function AdminScreen() {
         <View style={styles.content}>
           <AccessCard
             title={t('AdminAccessDeniedTitle')}
-            body={accessMessage ?? `Signed in as ${user.email ?? 'unknown user'}, but this account is not authorized for admin access.`}
+            body={accessMessage ?? t('AdminAccessDeniedBody')}
             icon="xmark.shield"
             colors={colors}
           />
@@ -284,7 +284,7 @@ export default function AdminScreen() {
         <View style={styles.content}>
           <AccessCard
             title={t('AdminBackendUnavailableTitle')}
-            body={accessMessage ?? 'The admin screen needs the protected backend function or a local fallback allowlist before it can reveal operational data.'}
+            body={accessMessage ?? t('AdminBackendUnavailableBody')}
             icon="server.rack"
             colors={colors}
           />
@@ -352,20 +352,20 @@ export default function AdminScreen() {
         {loading ? (
           <View style={styles.centerState}>
             <ActivityIndicator color={colors.primary} />
-            <ThemedText style={{ color: colors.textSecondary, marginTop: 12 }}>Loading admin metrics…</ThemedText>
+            <ThemedText style={{ color: colors.textSecondary, marginTop: 12 }}>{t('AdminLoadingMetrics')}</ThemedText>
           </View>
         ) : null}
 
         {error ? (
           <View style={[styles.sectionCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <ThemedText style={{ color: colors.danger, fontWeight: '700' }}>Admin metrics unavailable</ThemedText>
+            <ThemedText style={{ color: colors.danger, fontWeight: '700' }}>{t('AdminMetricsUnavailable')}</ThemedText>
             <ThemedText style={{ color: colors.textSecondary, marginTop: 6 }}>{error}</ThemedText>
           </View>
         ) : null}
 
         {accessMessage ? (
           <View style={[styles.sectionCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <ThemedText style={{ color: colors.text, fontWeight: '700' }}>Access mode note</ThemedText>
+            <ThemedText style={{ color: colors.text, fontWeight: '700' }}>{t('AdminAccessModeNote')}</ThemedText>
             <ThemedText style={{ color: colors.textSecondary, marginTop: 6, lineHeight: 20 }}>
               {accessMessage}
             </ThemedText>
@@ -374,21 +374,21 @@ export default function AdminScreen() {
 
         <View style={[styles.sectionCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <ThemedText type="subtitle" style={{ color: colors.text, fontSize: 18 }}>
-            Backend availability
+            {t('AdminBackendAvailability')}
           </ThemedText>
           <ThemedText style={{ color: colors.textSecondary, marginTop: 6, lineHeight: 20 }}>
-            This panel prefers a JWT-protected admin function for internal tables. If that function is not deployed yet, it falls back to public market telemetry only.
+            {t('AdminBackendAvailabilityBody')}
           </ThemedText>
 
           <View style={styles.infoRows}>
-            <InfoRow label="Admin email" value={user.email ?? '--'} colors={colors} />
-            <InfoRow label="Client allowlist configured" value={clientAdminConfigured ? 'yes' : 'no'} colors={colors} />
-            <InfoRow label="Client fallback allowed" value={clientAdminAllowed ? 'yes' : 'no'} colors={colors} />
-            <InfoRow label="Privileged source" value={privilegedStatus === 'edge' ? 'admin-status function' : 'public fallback'} valueColor={privilegedStatus === 'edge' ? colors.success : '#FFB020'} colors={colors} />
-            <InfoRow label="Backend allowlist source" value={edgeStatus ? edgeStatus.admin.allowlistSource : '--'} colors={colors} />
+            <InfoRow label={t('AdminEmailLabel')} value={user.email ?? '--'} colors={colors} />
+            <InfoRow label={t('AdminClientAllowlistConfigured')} value={clientAdminConfigured ? 'yes' : 'no'} colors={colors} />
+            <InfoRow label={t('AdminClientFallbackAllowed')} value={clientAdminAllowed ? 'yes' : 'no'} colors={colors} />
+            <InfoRow label={t('AdminPrivilegedSource')} value={privilegedStatus === 'edge' ? 'admin-status function' : 'public fallback'} valueColor={privilegedStatus === 'edge' ? colors.success : '#FFB020'} colors={colors} />
+            <InfoRow label={t('AdminBackendAllowlistSource')} value={edgeStatus ? edgeStatus.admin.allowlistSource : '--'} colors={colors} />
             <InfoRow
-              label="Function deploy state"
-              value={accessMode === 'edge' ? 'available' : accessMode === 'fallback' ? 'unavailable / fallback' : 'unknown'}
+              label={t('AdminFunctionDeployState')}
+              value={accessMode === 'edge' ? t('AdminAvailable') : accessMode === 'fallback' ? t('AdminUnavailableFallback') : t('AdminUnknown')}
               colors={colors}
             />
           </View>
@@ -396,26 +396,26 @@ export default function AdminScreen() {
 
         <View style={[styles.sectionCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <ThemedText type="subtitle" style={{ color: colors.text, fontSize: 18 }}>
-            Ingest health
+            {t('AdminIngestHealth')}
           </ThemedText>
           <ThemedText style={{ color: colors.textSecondary, marginTop: 6, lineHeight: 20 }}>
             {privilegedStatus === 'edge'
-              ? 'Privileged ingest metrics are live through the protected admin function.'
-              : 'Showing client-safe proxy based on the latest public snapshot batch until the protected admin function is deployed.'}
+              ? t('AdminIngestHealthPrivilegedBody')
+              : t('AdminIngestHealthFallbackBody')}
           </ThemedText>
 
           <View style={styles.infoRows}>
-            <InfoRow label="Feed status" value={effectiveFeedHealth.toUpperCase()} valueColor={effectiveFeedHealthTone} colors={colors} />
-            <InfoRow label="Latest snapshot" value={effectiveLatestTimestamp ? new Date(effectiveLatestTimestamp).toLocaleString() : '--'} colors={colors} />
-            <InfoRow label="1h change gaps" value={`${missing1h}`} colors={colors} />
-            <InfoRow label="24h change gaps" value={`${missing24h}`} colors={colors} />
+            <InfoRow label={t('AdminFeedStatus')} value={effectiveFeedHealth.toUpperCase()} valueColor={effectiveFeedHealthTone} colors={colors} />
+            <InfoRow label={t('AdminLatestSnapshot')} value={effectiveLatestTimestamp ? new Date(effectiveLatestTimestamp).toLocaleString() : '--'} colors={colors} />
+            <InfoRow label={t('Admin1hChangeGaps')} value={`${missing1h}`} colors={colors} />
+            <InfoRow label={t('Admin24hChangeGaps')} value={`${missing24h}`} colors={colors} />
             {edgeStatus ? (
               <>
-                <InfoRow label="Ingest runs sampled" value={`${edgeStatus.ingest.runCount}`} colors={colors} />
-                <InfoRow label="Failed runs (24h)" value={`${edgeStatus.ingest.failedRuns24h}`} valueColor={edgeStatus.ingest.failedRuns24h > 0 ? colors.danger : colors.success} colors={colors} />
-                <InfoRow label="Last run" value={edgeStatus.ingest.lastRun ? `${edgeStatus.ingest.lastRun.status} · ${formatRelativeTime(edgeStatus.ingest.lastRun.started_at)}` : '--'} colors={colors} />
+                <InfoRow label={t('AdminIngestRunsSampled')} value={`${edgeStatus.ingest.runCount}`} colors={colors} />
+                <InfoRow label={t('AdminFailedRuns24h')} value={`${edgeStatus.ingest.failedRuns24h}`} valueColor={edgeStatus.ingest.failedRuns24h > 0 ? colors.danger : colors.success} colors={colors} />
+                <InfoRow label={t('AdminLastRun')} value={edgeStatus.ingest.lastRun ? `${edgeStatus.ingest.lastRun.status} · ${formatRelativeTime(edgeStatus.ingest.lastRun.started_at)}` : '--'} colors={colors} />
                 {edgeStatus.ingest.lastFailure?.error ? (
-                  <InfoRow label="Last failure" value={truncate(edgeStatus.ingest.lastFailure.error, 52)} valueColor={colors.danger} colors={colors} />
+                  <InfoRow label={t('AdminLastFailure')} value={truncate(edgeStatus.ingest.lastFailure.error, 52)} valueColor={colors.danger} colors={colors} />
                 ) : null}
               </>
             ) : null}
@@ -424,24 +424,24 @@ export default function AdminScreen() {
 
         <View style={[styles.sectionCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <ThemedText type="subtitle" style={{ color: colors.text, fontSize: 18 }}>
-            Coin data status
+            {t('AdminCoinDataStatus')}
           </ThemedText>
 
           <View style={styles.infoRows}>
-            <InfoRow label="Missing prices" value={`${missingPrices}`} colors={colors} />
+            <InfoRow label={t('AdminMissingPrices')} value={`${missingPrices}`} colors={colors} />
             {edgeStatus ? (
               <>
-                <InfoRow label="Snapshots stored" value={formatCompactNumber(edgeStatus.coinData.snapshotsCount)} colors={colors} />
-                <InfoRow label="Whale metric rows" value={`${edgeStatus.coinData.whaleMetricsCount}`} valueColor={edgeStatus.coinData.whaleMetricsCount > 0 ? colors.success : '#FFB020'} colors={colors} />
-                <InfoRow label="Top trader rows" value={`${edgeStatus.coinData.topTradersCount}`} valueColor={edgeStatus.coinData.topTradersCount > 0 ? colors.success : '#FFB020'} colors={colors} />
+                <InfoRow label={t('AdminSnapshotsStored')} value={formatCompactNumber(edgeStatus.coinData.snapshotsCount)} colors={colors} />
+                <InfoRow label={t('AdminWhaleMetricRows')} value={`${edgeStatus.coinData.whaleMetricsCount}`} valueColor={edgeStatus.coinData.whaleMetricsCount > 0 ? colors.success : '#FFB020'} colors={colors} />
+                <InfoRow label={t('AdminTopTraderRows')} value={`${edgeStatus.coinData.topTradersCount}`} valueColor={edgeStatus.coinData.topTradersCount > 0 ? colors.success : '#FFB020'} colors={colors} />
               </>
             ) : null}
             <InfoRow
-              label="Top volume leader"
+              label={t('AdminTopVolumeLeader')}
               value={topVolumeLeader ? `${topVolumeLeader.symbol} · ${formatCompactDollars(topVolumeLeader.volume_24h_usd)}` : '--'}
               colors={colors}
             />
-            <InfoRow label="Watchlist sync" value={mode === 'account' ? syncState : 'local-only'} colors={colors} />
+            <InfoRow label={t('AdminWatchlistSync')} value={mode === 'account' ? syncState : 'local-only'} colors={colors} />
           </View>
 
           <View style={styles.previewList}>
@@ -463,15 +463,15 @@ export default function AdminScreen() {
 
         <View style={[styles.sectionCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <ThemedText type="subtitle" style={{ color: colors.text, fontSize: 18 }}>
-            Moderation & ops
+            {t('AdminModerationOps')}
           </ThemedText>
 
           {edgeStatus ? (
             <View style={styles.infoRows}>
-              <InfoRow label="Watchlists" value={`${edgeStatus.ops.watchlistsCount}`} colors={colors} />
-              <InfoRow label="Watchlist items" value={`${edgeStatus.ops.watchlistItemsCount}`} colors={colors} />
-              <InfoRow label="Activity events" value={`${edgeStatus.ops.activityEventsCount}`} colors={colors} />
-              <InfoRow label="Moderation queue" value={edgeStatus.moderation.available ? 'available' : 'not available'} valueColor={edgeStatus.moderation.available ? colors.success : '#FFB020'} colors={colors} />
+              <InfoRow label={t('AdminWatchlistsCount')} value={`${edgeStatus.ops.watchlistsCount}`} colors={colors} />
+              <InfoRow label={t('AdminWatchlistItemsCount')} value={`${edgeStatus.ops.watchlistItemsCount}`} colors={colors} />
+              <InfoRow label={t('AdminActivityEventsCount')} value={`${edgeStatus.ops.activityEventsCount}`} colors={colors} />
+              <InfoRow label={t('AdminModerationQueue')} value={edgeStatus.moderation.available ? t('AdminAvailable') : t('AdminNotAvailable')} valueColor={edgeStatus.moderation.available ? colors.success : '#FFB020'} colors={colors} />
             </View>
           ) : null}
 
@@ -518,7 +518,7 @@ export default function AdminScreen() {
           onPress={() => router.push('/menu')}
         >
           <IconSymbol name="chevron.left" size={16} color={colors.textSecondary} />
-          <ThemedText style={{ color: colors.textSecondary, fontWeight: '700' }}>Back to menu</ThemedText>
+          <ThemedText style={{ color: colors.textSecondary, fontWeight: '700' }}>{t('AdminBackToMenu')}</ThemedText>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>

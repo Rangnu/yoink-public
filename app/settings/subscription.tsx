@@ -11,13 +11,13 @@ export default function SubscriptionScreen() {
     <SafeAreaView edges={["top","left","right"]} style={{ flex: 1, backgroundColor: colors.background }}>
       <PlaceholderScreen
         icon="creditcard"
-        eyebrow="Subscription"
-        title="Subscription plans"
+        eyebrow={t('Subscription')}
+        title={t('PlaceholderSubscriptionTitle')}
         description={t('SubscriptionDescription')}
         bullets={[
-          'Future access to richer charting and advanced monitoring',
-          'Expanded alerts, layouts, and premium signal surfaces',
-          'Account-level billing and plan management',
+          t('PlaceholderSubscriptionBullet1'),
+          t('PlaceholderSubscriptionBullet2'),
+          t('PlaceholderSubscriptionBullet3'),
         ]}
       />
     </SafeAreaView>

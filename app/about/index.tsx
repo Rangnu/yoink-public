@@ -11,13 +11,13 @@ export default function AboutIndexScreen() {
     <SafeAreaView edges={["top","left","right"]} style={{ flex: 1, backgroundColor: colors.background }}>
       <PlaceholderScreen
         icon="info.circle"
-        eyebrow="About"
-        title="About Yoink"
-        description="Yoink is a signal-first crypto discovery app focused on fast scanning, live lists, and high-conviction drill-downs."
+        eyebrow={t('About')}
+        title={t('PlaceholderAboutTitle')}
+        description={t('PlaceholderAboutBody')}
         bullets={[
-          'AI Highlights for quick market-aware ideas',
-          'Explore for dense live market boards and rankings',
-          'Protected admin tooling for ingest health and ops visibility',
+          t('PlaceholderAboutBullet1'),
+          t('PlaceholderAboutBullet2'),
+          t('PlaceholderAboutBullet3'),
         ]}
         note={t('About')}
       />

@@ -11,13 +11,13 @@ export default function NotificationsSettingsScreen() {
     <SafeAreaView edges={["top","left","right"]} style={{ flex: 1, backgroundColor: colors.background }}>
       <PlaceholderScreen
         icon="bell.fill"
-        eyebrow="Notifications"
-        title="Notification preferences"
+        eyebrow={t('Notifications')}
+        title={t('PlaceholderNotificationsTitle')}
         description={t('NotificationsDescription')}
         bullets={[
-          'Price movement and momentum alerts',
-          'Watchlist and scouter notifications',
-          'Important account and security messages',
+          t('PlaceholderNotificationsBullet1'),
+          t('PlaceholderNotificationsBullet2'),
+          t('PlaceholderNotificationsBullet3'),
         ]}
       />
     </SafeAreaView>

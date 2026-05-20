@@ -11,13 +11,13 @@ export default function ReportProblemScreen() {
     <SafeAreaView edges={["top","left","right"]} style={{ flex: 1, backgroundColor: colors.background }}>
       <PlaceholderScreen
         icon="exclamationmark.bubble"
-        eyebrow="Report a problem"
-        title="Bug reporting flow"
-        description="This screen will become the structured path for reporting broken UI, incorrect market data, or auth/admin issues."
+        eyebrow={t('ReportProblem')}
+        title={t('PlaceholderReportTitle')}
+        description={t('PlaceholderReportBody')}
         bullets={[
-          'UI layout issues across Home, Explore, and detail pages',
-          'Incorrect prices, stale signals, or ingest-related errors',
-          'Tester/admin access problems and recovery details',
+          t('PlaceholderReportBullet1'),
+          t('PlaceholderReportBullet2'),
+          t('PlaceholderReportBullet3'),
         ]}
         note={t('ReportProblem')}
       />

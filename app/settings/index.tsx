@@ -11,13 +11,13 @@ export default function SettingsIndexScreen() {
     <SafeAreaView edges={["top","left","right"]} style={{ flex: 1, backgroundColor: colors.background }}>
       <PlaceholderScreen
         icon="gearshape.fill"
-        eyebrow="Settings"
-        title="Choose a setting to edit"
+        eyebrow={t('Settings')}
+        title={t('PlaceholderSettingsTitle')}
         description={t('SelectASetting')}
         bullets={[
-          'Appearance controls for light, dark, and system theme',
-          'Language, currency, and notification preferences',
-          'Subscription and account-level options as they become available',
+          t('PlaceholderSettingsBullet1'),
+          t('PlaceholderSettingsBullet2'),
+          t('PlaceholderSettingsBullet3'),
         ]}
       />
     </SafeAreaView>

@@ -11,13 +11,13 @@ export default function PrivacySecurityHelpScreen() {
     <SafeAreaView edges={["top","left","right"]} style={{ flex: 1, backgroundColor: colors.background }}>
       <PlaceholderScreen
         icon="lock.fill"
-        eyebrow="Privacy & Security"
-        title="Security guidance"
-        description="This section will collect account-safety guidance, privacy details, and recovery instructions for Yoink users and testers."
+        eyebrow={t('PrivacySecurityHelp')}
+        title={t('PlaceholderSecurityTitle')}
+        description={t('PlaceholderSecurityBody')}
         bullets={[
-          'Password, reset, and account recovery guidance',
-          'What data is stored locally vs synced to your account',
-          'How protected admin access is gated and audited',
+          t('PlaceholderSecurityBullet1'),
+          t('PlaceholderSecurityBullet2'),
+          t('PlaceholderSecurityBullet3'),
         ]}
         note={t('PrivacySecurityHelp')}
       />

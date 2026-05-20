@@ -11,13 +11,13 @@ export default function PrivacyPolicyScreen() {
     <SafeAreaView edges={["top","left","right"]} style={{ flex: 1, backgroundColor: colors.background }}>
       <PlaceholderScreen
         icon="lock.fill"
-        eyebrow="Legal"
-        title="Privacy policy"
-        description="A fuller privacy policy document will live here before broader public rollout."
+        eyebrow={t('PlaceholderLegalEyebrow')}
+        title={t('PlaceholderPrivacyTitle')}
+        description={t('PlaceholderPrivacyBody')}
         bullets={[
-          'What market data and account data Yoink stores',
-          'What remains device-local vs synced to Supabase',
-          'How tester/admin access is controlled and audited',
+          t('PlaceholderPrivacyBullet1'),
+          t('PlaceholderPrivacyBullet2'),
+          t('PlaceholderPrivacyBullet3'),
         ]}
         note={t('PrivacyPolicy')}
       />

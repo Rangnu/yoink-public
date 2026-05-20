@@ -11,13 +11,13 @@ export default function HelpCenterScreen() {
     <SafeAreaView edges={["top","left","right"]} style={{ flex: 1, backgroundColor: colors.background }}>
       <PlaceholderScreen
         icon="questionmark.circle"
-        eyebrow="Help Center"
-        title="Help content will live here"
-        description="This area will host quick-start guides, account help, and explanations of how lists, charts, and scouters work."
+        eyebrow={t('HelpCenter')}
+        title={t('PlaceholderHelpTitle')}
+        description={t('PlaceholderHelpBody')}
         bullets={[
-          'How AI Highlights and Explore lists are calculated',
-          'How to save, track, and revisit coins',
-          'How to use admin/tester flows safely during QA',
+          t('PlaceholderHelpBullet1'),
+          t('PlaceholderHelpBullet2'),
+          t('PlaceholderHelpBullet3'),
         ]}
         note={t('HelpCenter')}
       />

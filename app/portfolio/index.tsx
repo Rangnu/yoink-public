@@ -1,23 +1,25 @@
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PlaceholderScreen } from '@/components/ui/placeholder-screen';
+import { useSettings } from '@/contexts/settings-context';
 import { useTheme } from '@/contexts/theme-context';
 
 export default function PortfolioScreen() {
   const { colors } = useTheme();
+  const { t } = useSettings();
   return (
     <SafeAreaView edges={["top","left","right"]} style={{ flex: 1, backgroundColor: colors.background }}>
       <PlaceholderScreen
         icon="chart.line.uptrend.xyaxis"
-        eyebrow="Portfolio"
-        title="Portfolio tracking is coming next"
-        description="This screen will become your owned-position dashboard once portfolio ingestion and PnL tracking are wired into the product."
+        eyebrow={t('Portfolio')}
+        title={t('PlaceholderPortfolioTitle')}
+        description={t('PlaceholderPortfolioBody')}
         bullets={[
-          'Holdings summary, allocation, and daily portfolio movement',
-          'Entry prices, unrealized profit/loss, and performance history',
-          'Quick jumps from positions into coin detail charts and scouters',
+          t('PlaceholderPortfolioBullet1'),
+          t('PlaceholderPortfolioBullet2'),
+          t('PlaceholderPortfolioBullet3'),
         ]}
-        note="For now, use Saved and Explore to track ideas while the portfolio layer is being built."
+        note={t('PlaceholderPortfolioNote')}
       />
     </SafeAreaView>
   );

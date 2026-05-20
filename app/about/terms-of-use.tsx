@@ -11,13 +11,13 @@ export default function TermsOfUseScreen() {
     <SafeAreaView edges={["top","left","right"]} style={{ flex: 1, backgroundColor: colors.background }}>
       <PlaceholderScreen
         icon="doc.text"
-        eyebrow="Legal"
-        title="Terms of use"
-        description="A fuller terms document will live here as the product moves beyond the current tester-focused phase."
+        eyebrow={t('PlaceholderLegalEyebrow')}
+        title={t('PlaceholderTermsTitle')}
+        description={t('PlaceholderTermsBody')}
         bullets={[
-          'Usage rules for app data, signals, and alerts',
-          'Tester/admin responsibilities for internal environments',
-          'Future subscription and account terms',
+          t('PlaceholderTermsBullet1'),
+          t('PlaceholderTermsBullet2'),
+          t('PlaceholderTermsBullet3'),
         ]}
         note={t('TermsOfUse')}
       />

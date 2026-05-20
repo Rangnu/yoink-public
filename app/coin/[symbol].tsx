@@ -394,11 +394,11 @@ export default function CoinDetailScreen() {
 
             <View style={styles.statsGrid}>
               {[
-                { label: '1h', value: formatPercent(coin.change_1h_pct), size: 'small' },
-                { label: '24h', value: formatPercent(coin.change_24h_pct), size: 'small' },
-                { label: '7d', value: formatPercent(coin.change_7d_pct), size: 'small' },
-                { label: 'Volume', value: formatMoney(coin.volume_24h_usd), size: 'medium' },
-                { label: 'Market cap', value: formatMoney(coin.market_cap_usd), size: 'medium' },
+                { label: '1h', value: formatPercent(coin.change_1h_pct), size: 'small', tone: (coin.change_1h_pct ?? 0) >= 0 ? colors.success : colors.danger },
+                { label: '24h', value: formatPercent(coin.change_24h_pct), size: 'small', tone: (coin.change_24h_pct ?? 0) >= 0 ? colors.success : colors.danger },
+                { label: '7d', value: formatPercent(coin.change_7d_pct), size: 'small', tone: (coin.change_7d_pct ?? 0) >= 0 ? colors.success : colors.danger },
+                { label: 'Volume', value: formatCompactMoney(coin.volume_24h_usd), size: 'medium', tone: colors.text },
+                { label: 'Market cap', value: formatCompactMoney(coin.market_cap_usd), size: 'medium', tone: colors.text },
               ].map((item) => (
                 <View
                   key={item.label}
@@ -410,7 +410,7 @@ export default function CoinDetailScreen() {
                   ]}
                 >
                   <ThemedText style={{ color: colors.textSecondary, fontSize: 12 }}>{item.label}</ThemedText>
-                  <ThemedText style={{ color: colors.text, fontWeight: '700', marginTop: 8 }} numberOfLines={2}>
+                  <ThemedText style={{ color: item.tone, fontWeight: '700', marginTop: 8 }} numberOfLines={2}>
                     {item.value}
                   </ThemedText>
                 </View>

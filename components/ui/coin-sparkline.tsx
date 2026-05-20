@@ -248,10 +248,10 @@ export function CoinSparkline({
   const metrics = useMemo(() => {
     if (!series || series.length < 2) return null;
 
-    const priceTop = interactive ? 18 : 3;
-    const bottomInset = interactive ? 8 : 4;
-    const panelGap = showVolumeBars ? 12 : 0;
-    const volumeHeight = showVolumeBars ? Math.max(24, Math.round((height - priceTop - bottomInset) * 0.22)) : 0;
+    const priceTop = interactive ? 14 : 3;
+    const bottomInset = interactive ? 3 : 4;
+    const panelGap = showVolumeBars ? 6 : 0;
+    const volumeHeight = showVolumeBars ? Math.max(18, Math.round((height - priceTop - bottomInset) * 0.16)) : 0;
     const availablePriceHeight = Math.max(1, height - priceTop - bottomInset - panelGap - volumeHeight);
     const priceHeight = interactive || showVolumeBars
       ? Math.max(36, availablePriceHeight)

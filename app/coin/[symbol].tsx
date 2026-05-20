@@ -157,6 +157,16 @@ export default function CoinDetailScreen() {
       ? '--'
       : `$${value.toLocaleString(undefined, { maximumFractionDigits: value >= 1 ? 2 : 6 })}`;
 
+  const formatCompactMoney = (value: number | null) =>
+    value == null
+      ? '--'
+      : new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        notation: 'compact',
+        maximumFractionDigits: 1,
+      }).format(value);
+
   const formatPercent = (value: number | null) =>
     value == null ? '--' : `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`;
 
@@ -260,7 +270,7 @@ export default function CoinDetailScreen() {
                     Vol
                   </ThemedText>
                   <ThemedText style={{ color: colors.text, fontSize: 12, fontWeight: '700' }}>
-                    {formatMoney(coin.volume_24h_usd)}
+                    {formatCompactMoney(coin.volume_24h_usd)}
                   </ThemedText>
                 </View>
                 <View style={[styles.heroMetaPill, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
@@ -389,7 +399,6 @@ export default function CoinDetailScreen() {
                 { label: '7d', value: formatPercent(coin.change_7d_pct), size: 'small' },
                 { label: 'Volume', value: formatMoney(coin.volume_24h_usd), size: 'medium' },
                 { label: 'Market cap', value: formatMoney(coin.market_cap_usd), size: 'medium' },
-                { label: 'Updated', value: new Date(coin.ts).toLocaleString(), wide: true },
               ].map((item) => (
                 <View
                   key={item.label}
@@ -397,7 +406,6 @@ export default function CoinDetailScreen() {
                     styles.statCard,
                     item.size === 'small' ? styles.statCardSmall : null,
                     item.size === 'medium' ? styles.statCardMedium : null,
-                    item.wide ? styles.statCardWide : null,
                     { backgroundColor: colors.surface, borderColor: colors.border },
                   ]}
                 >

@@ -199,22 +199,31 @@ export default function ScoutersScreen() {
         criteria: 'Positive whale net flow from the latest whale snapshot',
         note: whaleMatches.length
           ? 'Tracks coins where whale inflows are showing up in the latest dataset.'
-          : 'Whale matches will appear once coin_whale_metrics is populated and readable by the app.',
+          : 'Needs whale and trader datasets before it can surface useful signals.',
         matches: whaleMatches,
         available: whaleRows.length > 0,
       },
     ];
   }, [marketRows, whaleRows]);
 
-  useEffect(() => {
-    if (!scouters.find((scouter) => scouter.id === selectedScouterId)) {
-      setSelectedScouterId(scouters[0]?.id ?? 'momentum');
-    }
-  }, [scouters, selectedScouterId]);
+  const availableScouters = useMemo(
+    () => scouters.filter((scouter) => scouter.available),
+    [scouters]
+  );
+  const upcomingScouters = useMemo(
+    () => scouters.filter((scouter) => !scouter.available),
+    [scouters]
+  );
 
-  const selectedScouter = scouters.find((scouter) => scouter.id === selectedScouterId) ?? scouters[0];
+  useEffect(() => {
+    if (!availableScouters.find((scouter) => scouter.id === selectedScouterId)) {
+      setSelectedScouterId(availableScouters[0]?.id ?? 'momentum');
+    }
+  }, [availableScouters, selectedScouterId]);
+
+  const selectedScouter = availableScouters.find((scouter) => scouter.id === selectedScouterId) ?? availableScouters[0];
   const recentMatches = useMemo(() => {
-    return scouters
+    return availableScouters
       .flatMap((scouter) =>
         scouter.matches.slice(0, 2).map((match) => ({
           ...match,
@@ -224,7 +233,7 @@ export default function ScoutersScreen() {
       )
       .sort((a, b) => b.score - a.score)
       .slice(0, 8);
-  }, [scouters]);
+  }, [availableScouters]);
   const lastUpdated = useMemo(() => getLatestTimestamp(marketRows), [marketRows]);
   const formatRelativeTime = useCallback((iso: string) => {
     const diffMs = Date.now() - new Date(iso).getTime();
@@ -345,11 +354,10 @@ export default function ScoutersScreen() {
 
             <View style={styles.section}>
               <ThemedText type="subtitle" style={[styles.sectionTitle, { color: colors.text }]}>
-                {t('YourScouters')}
+                {t('SignalPresetsSection')}
               </ThemedText>
-              {scouters.map((scouter) => {
+              {availableScouters.map((scouter) => {
                 const selected = selectedScouter?.id === scouter.id;
-                const active = scouter.available;
                 return (
                   <View key={scouter.id} style={[styles.card, { backgroundColor: selected ? colors.surfaceElevated : colors.surface, borderColor: selected ? colors.primary : colors.border }]}> 
                     <View style={styles.cardHeader}>
@@ -364,9 +372,9 @@ export default function ScoutersScreen() {
                           </ThemedText>
                         </View>
                       </View>
-                      <View style={[styles.statusBadge, { backgroundColor: active ? colors.success : colors.border }]}> 
-                        <ThemedText style={[styles.statusText, { color: active ? colors.primaryText : colors.textTertiary }]}>
-                          {active ? t('Active') : t('Paused')}
+                      <View style={[styles.statusBadge, { backgroundColor: colors.success }]}> 
+                        <ThemedText style={[styles.statusText, { color: colors.primaryText }]}>
+                          {t('Active')}
                         </ThemedText>
                       </View>
                     </View>
@@ -378,14 +386,14 @@ export default function ScoutersScreen() {
                       <View style={styles.stat}>
                         <IconSymbol name="chart.line.uptrend.xyaxis" size={15} color={colors.primary} />
                         <ThemedText style={{ color: colors.text, fontSize: 13, fontWeight: '600' }}>
-                          {scouter.matches.length} {t('MatchesToday')}
+                          {scouter.matches.length} {t('SignalMatchesCount')}
                         </ThemedText>
                       </View>
                     </View>
                     <View style={styles.cardActions}>
                       <TouchableOpacity style={[styles.actionButton, { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 }]} onPress={onRefresh}>
                         <IconSymbol name="play.fill" size={13} color={colors.primary} />
-                        <ThemedText style={{ color: colors.primary, fontSize: 12, fontWeight: '600' }}>{t('RunNow')}</ThemedText>
+                        <ThemedText style={{ color: colors.primary, fontSize: 12, fontWeight: '600' }}>{t('RefreshData')}</ThemedText>
                       </TouchableOpacity>
                       <TouchableOpacity style={[styles.actionButton, { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 }]} onPress={() => handleViewScouter(scouter.id)}>
                         <IconSymbol name="eye.fill" size={13} color={colors.text} />
@@ -396,6 +404,44 @@ export default function ScoutersScreen() {
                 );
               })}
             </View>
+
+            {upcomingScouters.length ? (
+              <View style={styles.section}>
+                <ThemedText type="subtitle" style={[styles.sectionTitle, { color: colors.text }]}>
+                  {t('ComingSoonSignals')}
+                </ThemedText>
+                <View style={[styles.infoCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                  <ThemedText style={{ color: colors.textSecondary, lineHeight: 20 }}>
+                    {t('ComingSoonSignalsBody')}
+                  </ThemedText>
+                </View>
+                {upcomingScouters.map((scouter) => (
+                  <View key={scouter.id} style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                    <View style={styles.cardHeader}>
+                      <View style={styles.cardLeft}>
+                        <IconSymbol name="scope" size={20} color={colors.textTertiary} />
+                        <View style={{ flex: 1 }}>
+                          <ThemedText type="defaultSemiBold" style={{ color: colors.text }} numberOfLines={1}>
+                            {scouter.name}
+                          </ThemedText>
+                          <ThemedText style={{ color: colors.textTertiary, fontSize: 11, marginTop: 2 }} numberOfLines={2}>
+                            {scouter.criteria}
+                          </ThemedText>
+                        </View>
+                      </View>
+                      <View style={[styles.statusBadge, { backgroundColor: colors.border }]}>
+                        <ThemedText style={[styles.statusText, { color: colors.textTertiary }]}>
+                          {t('ComingSoon')}
+                        </ThemedText>
+                      </View>
+                    </View>
+                    <View style={[styles.criteriaBox, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                      <ThemedText style={{ color: colors.textSecondary, fontSize: 11 }}>{scouter.note}</ThemedText>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            ) : null}
 
             {selectedScouter ? (
               <View ref={matchesSectionRef as any} style={styles.section}>

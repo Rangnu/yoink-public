@@ -10,6 +10,7 @@ import { useSettings } from '@/contexts/settings-context';
 import { useTheme } from '@/contexts/theme-context';
 import { useWatchlist } from '@/contexts/watchlist-context';
 import { fetchCoinMarketRows, getLatestTimestamp } from '@/utils/coin-market';
+import { canAccessAdmin } from '@/utils/admin';
 
 export default function MenuScreen() {
   const { colors } = useTheme();
@@ -48,7 +49,7 @@ export default function MenuScreen() {
   const accountSubtitle = user?.email || t('SignInSyncLater');
   const pushLogin = (redirectTo: string) =>
     router.push({ pathname: '/auth/login', params: { redirectTo } } as any);
-  const showAdminPanel = Boolean(user);
+  const showAdminPanel = canAccessAdmin(user);
   const feedStatusLabel = useMemo(() => {
     if (feedStatus === 'live') return t('LiveStatus');
     if (feedStatus === 'error') return t('OfflineStatus');

@@ -347,7 +347,7 @@ export function CoinSparkline({
   const selectionStroke = resolvedTheme === 'dark' ? 'rgba(255,255,255,0.18)' : 'rgba(31,41,55,0.18)';
 
   return (
-    <View style={[styles.container, { width, height: interactive ? height + 48 : height }]}>
+    <View style={[styles.container, { width, height }]}>
       {interactive && selectedPoint ? (
         <View
           pointerEvents="none"

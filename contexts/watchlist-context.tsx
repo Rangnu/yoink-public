@@ -66,8 +66,6 @@ function uniq(values: string[]) {
 
 function buildLocalWatchlists(symbols: string[]): WatchlistSummary[] {
   const uniqueSymbols = uniq(symbols);
-  if (!uniqueSymbols.length) return [];
-
   return [
     {
       id: LOCAL_WATCHLIST_ID,
@@ -176,11 +174,16 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const persistLocalGuestWatchlists = useCallback(async (nextWatchlists: WatchlistSummary[]) => {
-    const normalized = sortWatchlists(nextWatchlists.map((watchlist) => ({
+    const normalizedBase = nextWatchlists.map((watchlist) => ({
       ...watchlist,
       local: true,
       symbols: uniq(watchlist.symbols),
-    })));
+    }));
+    const normalized = sortWatchlists(
+      normalizedBase.length
+        ? normalizedBase
+        : buildLocalWatchlists([])
+    );
     const union = unionSymbolsFromWatchlists(normalized);
     symbolsRef.current = union;
     watchlistsRef.current = normalized;
@@ -309,7 +312,7 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
 
   const syncWithAccount = useCallback(async (userId: string, localSymbols: string[]) => {
     let remoteWatchlists = await loadRemoteWatchlists(userId);
-    const defaultId = await ensureDefaultWatchlist(userId, { allowCreate: localSymbols.length > 0 });
+    const defaultId = await ensureDefaultWatchlist(userId, { allowCreate: true });
     const remoteSymbols = unionSymbolsFromWatchlists(remoteWatchlists);
     const missingRemoteSymbols = uniq(localSymbols).filter((symbol) => !remoteSymbols.includes(symbol));
 
@@ -789,25 +792,6 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
     }
   }, [closeSavePicker, createWatchlist, pickerBusy, pickerDraftName, pickerSymbol, saveCoin]);
 
-  const handlePickerCreateDefaultWatchlist = useCallback(async () => {
-    if (!pickerSymbol || pickerBusy) return;
-
-    setPickerBusy(true);
-    setPickerError(null);
-
-    try {
-      const created = await createWatchlist(DEFAULT_WATCHLIST_NAME);
-      if (created?.id) {
-        await saveCoin(pickerSymbol, created.id);
-        closeSavePicker();
-      }
-    } catch (err: any) {
-      setPickerError(err?.message ?? 'Could not create watchlist.');
-    } finally {
-      setPickerBusy(false);
-    }
-  }, [closeSavePicker, createWatchlist, pickerBusy, pickerSymbol, saveCoin]);
-
   const value = useMemo<WatchlistContextValue>(() => ({
     symbols,
     loading,
@@ -872,72 +856,42 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
             Save to...
           </ThemedText>
 
-          {watchlists.length ? (
-            <View style={styles.sheetList}>
-              {watchlists.map((watchlist) => {
-                const selected = pickerSymbol ? isSaved(pickerSymbol, watchlist.id) : false;
-                const initials = watchlist.name.slice(0, 2).toUpperCase();
-                const subtitle = watchlist.isDefault
-                  ? 'Private · Default'
-                  : `Private · ${watchlist.symbols.length} coin${watchlist.symbols.length === 1 ? '' : 's'}`;
-                return (
-                  <TouchableOpacity
-                    key={watchlist.id}
-                    style={[styles.sheetRow, { borderColor: colors.border }]}
-                    onPress={() => handlePickerToggleWatchlist(watchlist.id)}
-                    disabled={pickerBusy}
-                  >
-                    <View style={[styles.sheetThumb, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
-                      <ThemedText style={{ color: colors.text, fontSize: 12, fontWeight: '800' }}>
-                        {initials}
-                      </ThemedText>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <ThemedText style={{ color: colors.text, fontWeight: '700', fontSize: 16 }}>
-                        {watchlist.name}
-                      </ThemedText>
-                      <ThemedText style={{ color: colors.textSecondary, fontSize: 12, marginTop: 3 }}>
-                        {subtitle}
-                      </ThemedText>
-                    </View>
-                    <IconSymbol
-                      name={selected ? 'bookmark.fill' : 'bookmark'}
-                      size={22}
-                      color={selected ? colors.primary : colors.textSecondary}
-                    />
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          ) : (
-            <View style={[styles.emptyCreateCard, { borderColor: colors.border, backgroundColor: colors.surfaceElevated }]}>
-              <ThemedText style={{ color: colors.text, fontWeight: '700', fontSize: 16 }}>
-                No watchlists yet
-              </ThemedText>
-              <ThemedText style={{ color: colors.textSecondary, marginTop: 6, lineHeight: 20 }}>
-                Create a basic watchlist now, or name your first watchlist before saving this coin.
-              </ThemedText>
-              <View style={styles.createActionsRow}>
+          <View style={styles.sheetList}>
+            {watchlists.map((watchlist) => {
+              const selected = pickerSymbol ? isSaved(pickerSymbol, watchlist.id) : false;
+              const initials = watchlist.name.slice(0, 2).toUpperCase();
+              const subtitle = watchlist.isDefault
+                ? 'Default watchlist'
+                : `${watchlist.symbols.length} coin${watchlist.symbols.length === 1 ? '' : 's'}`;
+              return (
                 <TouchableOpacity
-                  style={[styles.secondaryActionButton, { borderColor: colors.border }]}
+                  key={watchlist.id}
+                  style={[styles.sheetRow, { borderColor: colors.border }]}
+                  onPress={() => handlePickerToggleWatchlist(watchlist.id)}
                   disabled={pickerBusy}
-                  onPress={handlePickerCreateDefaultWatchlist}
                 >
-                  <ThemedText style={{ color: colors.text, fontWeight: '700' }}>Create basic</ThemedText>
+                  <View style={[styles.sheetThumb, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
+                    <ThemedText style={{ color: colors.text, fontSize: 12, fontWeight: '800' }}>
+                      {initials}
+                    </ThemedText>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <ThemedText style={{ color: colors.text, fontWeight: '700', fontSize: 16 }}>
+                      {watchlist.name}
+                    </ThemedText>
+                    <ThemedText style={{ color: colors.textSecondary, fontSize: 12, marginTop: 3 }}>
+                      {subtitle}
+                    </ThemedText>
+                  </View>
+                  <IconSymbol
+                    name={selected ? 'bookmark.fill' : 'bookmark'}
+                    size={22}
+                    color={selected ? colors.primary : colors.textSecondary}
+                  />
                 </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.createButton, { backgroundColor: colors.primary, opacity: pickerBusy ? 0.7 : 1 }]}
-                  disabled={pickerBusy}
-                  onPress={() => {
-                    setPickerCreateMode(true);
-                    setPickerError(null);
-                  }}
-                >
-                  <ThemedText style={{ color: colors.primaryText, fontWeight: '700' }}>Name your own</ThemedText>
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
+              );
+            })}
+          </View>
 
           {pickerCreateMode ? (
             <View style={[styles.createCard, { borderColor: colors.border, backgroundColor: colors.surfaceElevated }]}> 
@@ -976,7 +930,7 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
                 </TouchableOpacity>
               </View>
             </View>
-          ) : watchlists.length ? (
+          ) : (
             <TouchableOpacity
               style={[styles.newWatchlistButton, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
               disabled={pickerBusy}
@@ -988,7 +942,7 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
               <IconSymbol name="plus.circle.fill" size={20} color={colors.text} />
               <ThemedText style={{ color: colors.text, fontWeight: '700' }}>New watchlist</ThemedText>
             </TouchableOpacity>
-          ) : null}
+          )}
 
           {pickerError ? (
             <ThemedText style={{ color: colors.danger, marginTop: 10 }}>{pickerError}</ThemedText>
@@ -1065,12 +1019,6 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 14,
     gap: 10,
-  },
-  emptyCreateCard: {
-    marginTop: 4,
-    borderWidth: 1,
-    borderRadius: 14,
-    padding: 14,
   },
   input: {
     borderWidth: 1,

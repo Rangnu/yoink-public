@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Svg, { Circle } from 'react-native-svg';
 
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -464,10 +465,21 @@ export default function AdminScreen() {
             Positive vs negative 24h movers across the current live market set.
           </ThemedText>
 
-          <View style={styles.breadthBar}>
-            <View style={[styles.breadthSegment, { flex: positive24hCount || 1, backgroundColor: colors.success }]} />
-            <View style={[styles.breadthSegment, { flex: flat24hCount || 1, backgroundColor: colors.textTertiary }]} />
-            <View style={[styles.breadthSegment, { flex: negative24hCount || 1, backgroundColor: colors.danger }]} />
+          <View style={styles.breadthChartWrap}>
+            <DonutBreakdown
+              size={148}
+              strokeWidth={16}
+              centerLabel={`${rows.length}`}
+              centerCaption="coins"
+              segments={[
+                { value: positive24hCount, color: colors.success },
+                { value: flat24hCount, color: opsMuted },
+                { value: negative24hCount, color: colors.danger },
+              ]}
+              trackColor="rgba(255,255,255,0.06)"
+              textColor={opsText}
+              subtextColor={opsSubtext}
+            />
           </View>
 
           <View style={styles.legendRow}>
@@ -830,6 +842,73 @@ function LegendChip({ label, color, colors, dark = false }: { label: string; col
   );
 }
 
+function DonutBreakdown({
+  size,
+  strokeWidth,
+  segments,
+  trackColor,
+  centerLabel,
+  centerCaption,
+  textColor,
+  subtextColor,
+}: {
+  size: number;
+  strokeWidth: number;
+  segments: { value: number; color: string }[];
+  trackColor: string;
+  centerLabel: string;
+  centerCaption: string;
+  textColor: string;
+  subtextColor: string;
+}) {
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const total = Math.max(1, segments.reduce((sum, segment) => sum + segment.value, 0));
+  let consumed = 0;
+
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <Svg width={size} height={size}>
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke={trackColor}
+          strokeWidth={strokeWidth}
+          fill="none"
+        />
+        {segments.map((segment, index) => {
+          const fraction = segment.value / total;
+          const length = Math.max(0, circumference * fraction);
+          const offset = circumference * (1 - consumed);
+          consumed += fraction;
+
+          return (
+            <Circle
+              key={`${segment.color}-${index}`}
+              cx={size / 2}
+              cy={size / 2}
+              r={radius}
+              stroke={segment.color}
+              strokeWidth={strokeWidth}
+              strokeLinecap="round"
+              fill="none"
+              strokeDasharray={`${length} ${circumference}`}
+              strokeDashoffset={offset}
+              rotation={-90}
+              origin={`${size / 2}, ${size / 2}`}
+            />
+          );
+        })}
+      </Svg>
+      <View style={styles.donutCenter}>
+        <ThemedText style={{ color: textColor, fontSize: 22, fontWeight: '800' }}>{centerLabel}</ThemedText>
+        <ThemedText style={{ color: subtextColor, fontSize: 12 }}>{centerCaption}</ThemedText>
+      </View>
+    </View>
+  );
+}
+
 function CoverageRow({ label, value, color, colors }: { label: string; value: number; color: string; colors: any }) {
   return (
     <View style={styles.coverageRow}>
@@ -945,6 +1024,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: 12,
   },
+  breadthChartWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 14,
+  },
   breadthBar: {
     marginTop: 14,
     height: 14,
@@ -974,6 +1058,11 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
+  },
+  donutCenter: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   runPulseWrap: {
     flexDirection: 'row',

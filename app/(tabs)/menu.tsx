@@ -149,6 +149,17 @@ export default function MenuScreen() {
           <StatCard label={t('SyncLabel')} value={user ? t('AccountMode') : t('LocalMode')} detail={user ? t('AuthSessionReady') : t('DeviceOnlyMode')} colors={colors} />
         </View>
 
+        {showAdminPanel ? (
+          <Section title={t('Admin')} icon="lock.shield.fill" colors={colors}>
+            <MenuRow
+              icon="waveform.path.ecg.rectangle"
+              label={t('AdminPanel')}
+              onPress={() => router.push('/admin' as any)}
+              colors={colors}
+            />
+          </Section>
+        ) : null}
+
         <Section title={t('Settings')} icon="gearshape.fill" colors={colors}>
           <MenuRow icon="paintbrush.fill" label={t('Appearance')} onPress={() => router.push('/settings/appearance')} colors={colors} />
           <MenuRow icon="globe" label={t('Language')} onPress={() => router.push('/settings/language')} colors={colors} divider colorsObj={colors} />
@@ -163,17 +174,6 @@ export default function MenuScreen() {
           <MenuRow icon="scope" label={t('Scouters')} onPress={() => router.push('/scouters')} colors={colors} divider colorsObj={colors} />
           <MenuRow icon="list.number" label={t('Top100Rankings')} onPress={() => router.push('/explore/top100')} colors={colors} />
         </Section>
-
-        {showAdminPanel ? (
-          <Section title={t('Admin')} icon="lock.shield.fill" colors={colors}>
-            <MenuRow
-              icon="waveform.path.ecg.rectangle"
-              label={t('AdminPanel')}
-              onPress={() => router.push('/admin' as any)}
-              colors={colors}
-            />
-          </Section>
-        ) : null}
 
         <Section title={t('Activity')} icon="person.crop.circle" colors={colors}>
           <MenuRow

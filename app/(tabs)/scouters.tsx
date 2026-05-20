@@ -242,7 +242,7 @@ export default function ScoutersScreen() {
                   {t('RecentMatches')}
                 </ThemedText>
               </View>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.matchesScroll}>
+              <View style={styles.snapshotGrid}>
                 {recentMatches.length ? recentMatches.map((match) => (
                   <TouchableOpacity
                     key={`${match.scouterId}-${match.symbol}`}
@@ -267,7 +267,7 @@ export default function ScoutersScreen() {
                     <ThemedText style={{ color: colors.textSecondary }}>{t('NoLiveMatchesYet')}</ThemedText>
                   </View>
                 )}
-              </ScrollView>
+              </View>
             </View>
 
             <TouchableOpacity style={[styles.createButton, { backgroundColor: colors.primary, borderColor: colors.primary }]} onPress={onRefresh}>
@@ -418,25 +418,26 @@ const styles = StyleSheet.create({
   sectionHeader: {
     marginBottom: 4,
   },
-  matchesScroll: {
-    marginLeft: -20,
-    paddingLeft: 20,
+  snapshotGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    justifyContent: 'space-between',
   },
   matchCard: {
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderRadius: 10,
     borderWidth: 1,
-    marginRight: 10,
-    minWidth: 120,
+    width: '48%',
+    minWidth: 0,
   },
   emptyInlineCard: {
     paddingHorizontal: 14,
     paddingVertical: 12,
     borderRadius: 12,
     borderWidth: 1,
-    marginRight: 10,
-    width: 240,
+    width: '100%',
   },
   createButton: {
     flexDirection: 'row',

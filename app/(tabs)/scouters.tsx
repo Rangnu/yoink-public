@@ -9,15 +9,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useSettings } from '@/contexts/settings-context';
 import { useTheme } from '@/contexts/theme-context';
 import { useWatchlist } from '@/contexts/watchlist-context';
-import { supabase } from '@/utils/supabase';
 import { CoinMarketRow, fetchCoinMarketRows, formatCoinPercent, formatCoinPrice, getLatestTimestamp } from '@/utils/coin-market';
-
-type WhaleMetricRow = {
-  coin_id: string;
-  whale_net_flow_usd: number | null;
-  top_traders_count: number | null;
-  ts: string;
-};
 
 type LiveScouterMatch = {
   symbol: string;
@@ -47,7 +39,6 @@ export default function ScoutersScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [marketRows, setMarketRows] = useState<CoinMarketRow[]>([]);
-  const [whaleRows, setWhaleRows] = useState<WhaleMetricRow[]>([]);
   const [selectedScouterId, setSelectedScouterId] = useState<string>('momentum');
   const scrollRef = useRef<ScrollView>(null);
   const matchesSectionRef = useRef<View | null>(null);
@@ -57,32 +48,10 @@ export default function ScoutersScreen() {
       setLoading(true);
       setError(null);
 
-      const [markets, whaleResponse] = await Promise.all([
-        fetchCoinMarketRows(120),
-        supabase
-          .from('coin_whale_metrics')
-          .select('coin_id, whale_net_flow_usd, top_traders_count, ts')
-          .order('ts', { ascending: false })
-          .limit(200),
-      ]);
-
+      const markets = await fetchCoinMarketRows(120);
       setMarketRows(markets);
-
-      if (whaleResponse.error) {
-        setWhaleRows([]);
-      } else {
-        const latestByCoin = new Map<string, WhaleMetricRow>();
-        for (const row of (whaleResponse.data ?? []) as WhaleMetricRow[]) {
-          if (!row.coin_id) continue;
-          if (!latestByCoin.has(row.coin_id)) {
-            latestByCoin.set(row.coin_id, row);
-          }
-        }
-        setWhaleRows(Array.from(latestByCoin.values()));
-      }
     } catch (err: any) {
       setMarketRows([]);
-      setWhaleRows([]);
       setError(err?.message ?? 'Failed to load live scouters.');
     } finally {
       setLoading(false);
@@ -100,7 +69,6 @@ export default function ScoutersScreen() {
 
   const scouters = useMemo<LiveScouter[]>(() => {
     const rows = marketRows;
-    const whaleByCoinId = new Map(whaleRows.map((row) => [row.coin_id, row]));
 
     const momentumMatches = rows
       .filter((row) => (row.change_1h_pct ?? -999) >= 1.2 && (row.change_24h_pct ?? -999) >= 4)
@@ -147,27 +115,6 @@ export default function ScoutersScreen() {
         score: row.change_24h_pct ?? 0,
       }));
 
-    const whaleMatches: LiveScouterMatch[] = rows.reduce<LiveScouterMatch[]>((acc, row) => {
-      const whale = row.coin_id ? whaleByCoinId.get(row.coin_id) : undefined;
-      if (!whale) return acc;
-      if ((whale.whale_net_flow_usd ?? 0) <= 0) return acc;
-
-      acc.push({
-        symbol: row.symbol,
-        name: row.name,
-        coinId: row.coin_id,
-        price: formatCoinPrice(row.price_usd),
-        primaryMetric: `Net ${formatCompactDollars(whale.whale_net_flow_usd)}`,
-        secondaryMetric: `${whale.top_traders_count ?? 0} top traders`,
-        changePct: row.change_24h_pct,
-        score: whale.whale_net_flow_usd ?? 0,
-      });
-
-      return acc;
-    }, [])
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 8);
-
     return [
       {
         id: 'momentum',
@@ -193,25 +140,11 @@ export default function ScoutersScreen() {
         matches: breakoutMatches,
         available: rows.length > 0,
       },
-      {
-        id: 'whale',
-        name: 'Whale Flow',
-        criteria: 'Positive whale net flow from the latest whale snapshot',
-        note: whaleMatches.length
-          ? 'Tracks coins where whale inflows are showing up in the latest dataset.'
-          : 'Needs whale and trader datasets before it can surface useful signals.',
-        matches: whaleMatches,
-        available: whaleRows.length > 0,
-      },
     ];
-  }, [marketRows, whaleRows]);
+  }, [marketRows]);
 
   const availableScouters = useMemo(
     () => scouters.filter((scouter) => scouter.available),
-    [scouters]
-  );
-  const upcomingScouters = useMemo(
-    () => scouters.filter((scouter) => !scouter.available),
     [scouters]
   );
 
@@ -287,16 +220,6 @@ export default function ScoutersScreen() {
           />
         )}
       >
-        <View style={[styles.infoCard, { backgroundColor: colors.surface, borderColor: colors.border }]}> 
-          <ThemedText style={{ color: colors.text, fontWeight: '700' }}>{t('LivePresetsTitle')}</ThemedText>
-          <ThemedText style={{ color: colors.textSecondary, marginTop: 6, lineHeight: 20 }}>
-            {t('LivePresetsBody')}
-          </ThemedText>
-          <ThemedText style={{ color: colors.textTertiary, marginTop: 10, fontSize: 12 }}>
-            {t('LastMarketUpdate')}: {lastUpdated ? new Date(lastUpdated).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}
-          </ThemedText>
-        </View>
-
         {loading ? (
           <View style={styles.centerState}>
             <ActivityIndicator color={colors.primary} />
@@ -404,44 +327,6 @@ export default function ScoutersScreen() {
                 );
               })}
             </View>
-
-            {upcomingScouters.length ? (
-              <View style={styles.section}>
-                <ThemedText type="subtitle" style={[styles.sectionTitle, { color: colors.text }]}>
-                  {t('ComingSoonSignals')}
-                </ThemedText>
-                <View style={[styles.infoCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                  <ThemedText style={{ color: colors.textSecondary, lineHeight: 20 }}>
-                    {t('ComingSoonSignalsBody')}
-                  </ThemedText>
-                </View>
-                {upcomingScouters.map((scouter) => (
-                  <View key={scouter.id} style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                    <View style={styles.cardHeader}>
-                      <View style={styles.cardLeft}>
-                        <IconSymbol name="scope" size={20} color={colors.textTertiary} />
-                        <View style={{ flex: 1 }}>
-                          <ThemedText type="defaultSemiBold" style={{ color: colors.text }} numberOfLines={1}>
-                            {scouter.name}
-                          </ThemedText>
-                          <ThemedText style={{ color: colors.textTertiary, fontSize: 11, marginTop: 2 }} numberOfLines={2}>
-                            {scouter.criteria}
-                          </ThemedText>
-                        </View>
-                      </View>
-                      <View style={[styles.statusBadge, { backgroundColor: colors.border }]}>
-                        <ThemedText style={[styles.statusText, { color: colors.textTertiary }]}>
-                          {t('ComingSoon')}
-                        </ThemedText>
-                      </View>
-                    </View>
-                    <View style={[styles.criteriaBox, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                      <ThemedText style={{ color: colors.textSecondary, fontSize: 11 }}>{scouter.note}</ThemedText>
-                    </View>
-                  </View>
-                ))}
-              </View>
-            ) : null}
 
             {selectedScouter ? (
               <View ref={matchesSectionRef as any} style={styles.section}>

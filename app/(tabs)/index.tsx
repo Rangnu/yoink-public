@@ -12,15 +12,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 export default function HomeScreen() {
   const { colors } = useTheme();
   const { t } = useSettings();
-  const formatCoinsAccess = (count: number) => {
-    const key = count === 1 ? 'CoinsAccessOne' : 'CoinsAccessMany';
-    return t(key).replace('{count}', `${count}`);
-  };
-
-  const formatUnlockMoreStocks = (count: number) => t('UnlockMoreStocks').replace('{count}', `${count}`);
   const [tab, setTab] = useState<'balanced' | 'fomo' | 'yoink'>('fomo');
   const [refreshing, setRefreshing] = useState(false);
-  const [unlocked, setUnlocked] = useState<{ [k: string]: number }>({}); // section -> expiresAt (ms)
   // Animated scroll value to coordinate header behaviors
   const scrollY = useRef(new Animated.Value(0)).current;
 
@@ -126,19 +119,6 @@ export default function HomeScreen() {
     yoink: HighlightRow[];
   } | null>(null);
 
-  const costs: Record<typeof tab, number> = {
-    balanced: 1,
-    fomo: 2,
-    yoink: 3,
-  } as const;
-
-  const isUnlocked = (section: typeof tab) => (unlocked[section] ?? 0) > Date.now();
-  const handleUnlock = (section: typeof tab) => {
-    // Placeholder: pretend we spent coins and grant 24h access. Wire to backend later.
-    const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
-    setUnlocked((prev) => ({ ...prev, [section]: expiresAt }));
-  };
-
   const buildHighlightRows = useCallback((rows: any[]): {
     balanced: HighlightRow[];
     fomo: HighlightRow[];
@@ -223,7 +203,6 @@ export default function HomeScreen() {
 
   const baseData = liveHighlights ?? mockData;
   const current = baseData[tab];
-  const showAll = isUnlocked(tab);
   const onRefresh = () => {
     setRefreshing(true);
     loadHighlights().finally(() => setRefreshing(false));
@@ -242,37 +221,12 @@ export default function HomeScreen() {
     return 4;
   };
 
-  // Animated glow and chevrons for Unlock CTA
-  const glowPulse = useRef(new Animated.Value(0)).current;
-  const chevAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    const glow = Animated.loop(
-      Animated.sequence([
-        Animated.timing(glowPulse, { toValue: 1, duration: 900, useNativeDriver: false }),
-        Animated.timing(glowPulse, { toValue: 0, duration: 900, useNativeDriver: false }),
-      ])
-    );
-    const chev = Animated.loop(
-      Animated.sequence([
-        Animated.timing(chevAnim, { toValue: 1, duration: 700, useNativeDriver: true }),
-        Animated.timing(chevAnim, { toValue: 0, duration: 700, useNativeDriver: true }),
-      ])
-    );
-    glow.start();
-    chev.start();
-    return () => {
-      glow.stop();
-      chev.stop();
-    };
-  }, [glowPulse, chevAnim]);
-
   return (
     <SafeAreaView edges={["top","left","right"]} style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Scrollable content with sticky Markets header */}
       <Animated.ScrollView
         contentContainerStyle={styles.listContainer}
-        stickyHeaderIndices={[1, 7, showAll ? 10 : 9]}
+        stickyHeaderIndices={[1, 7, 9]}
         contentInsetAdjustmentBehavior="never"
         refreshControl={(
           <RefreshControl
@@ -399,15 +353,14 @@ export default function HomeScreen() {
 
         {/* First 5 stocks as direct children (so sticky block releases after them) */}
         {current.slice(0, 5).map((stock, idx) => {
-          const visible = showAll || idx < 3;
           return (
             <HomeHighlightRow
               key={`${tab}-${stock.symbol}-first`}
               index={idx + 1}
               stock={stock}
-              visible={visible}
+              visible
               chartRange={tab === 'yoink' ? '1H' : '24H'}
-              onPress={visible ? () => router.push({ pathname: '/coin' as any, params: { symbol: stock.symbol } }) : undefined}
+              onPress={() => router.push({ pathname: '/coin' as any, params: { symbol: stock.symbol } })}
               formatDollarMove={formatDollarMove}
               colors={colors}
             />
@@ -421,91 +374,20 @@ export default function HomeScreen() {
         <View style={styles.stocksWrapper}>
           {current.slice(5).map((stock, idx) => {
             const originalIndex = 5 + idx;
-            const visible = showAll || originalIndex < 3;
             return (
               <HomeHighlightRow
                 key={`${tab}-${stock.symbol}-rest`}
                 index={originalIndex + 1}
                 stock={stock}
-                visible={visible}
+                visible
                 chartRange={tab === 'yoink' ? '1H' : '24H'}
-                onPress={visible ? () => router.push({ pathname: '/coin' as any, params: { symbol: stock.symbol } }) : undefined}
+                onPress={() => router.push({ pathname: '/coin' as any, params: { symbol: stock.symbol } })}
                 formatDollarMove={formatDollarMove}
                 colors={colors}
               />
             );
           })}
-
-          {!showAll && (
-            <View style={styles.unlockOverlay}>
-              <Animated.View
-                style={[
-                  styles.unlockGlow,
-                  {
-                    shadowColor: colors.primary,
-                    shadowOpacity: glowPulse.interpolate({ inputRange: [0, 1], outputRange: [0.2, 0.45] }),
-                    shadowRadius: glowPulse.interpolate({ inputRange: [0, 1], outputRange: [10, 18] }),
-                    shadowOffset: { width: 0, height: 0 },
-                    elevation: 6,
-                  },
-                ]}
-              >
-                <Animated.View
-                  pointerEvents="none"
-                  style={[
-                    styles.unlockAura,
-                    {
-                      backgroundColor: colors.primary,
-                      opacity: glowPulse.interpolate({ inputRange: [0, 1], outputRange: [0.12, 0.26] }),
-                      transform: [{ scale: glowPulse.interpolate({ inputRange: [0, 1], outputRange: [0.98, 1.04] }) }],
-                    },
-                  ]}
-                />
-                <TouchableOpacity
-                  onPress={() => handleUnlock(tab)}
-                  activeOpacity={0.9}
-                  style={[styles.centeredUnlockBtn, { backgroundColor: colors.primary }]}
-                >
-                  <IconSymbol name="lock.open.fill" size={20} color={colors.primaryText} />
-                  <View style={styles.unlockTextContainer}>
-                    <ThemedText style={{ color: colors.primaryText, fontWeight: '700', fontSize: 16 }}>
-                      {formatUnlockMoreStocks(current.length - 3)}
-                    </ThemedText>
-                    <ThemedText style={{ color: colors.primaryText, fontSize: 13, opacity: 0.9 }}>
-                      {formatCoinsAccess(costs[tab])}
-                    </ThemedText>
-                  </View>
-                  <View style={{ width: 28, alignItems: 'flex-end', justifyContent: 'center', flexDirection: 'row' }}>
-                    <Animated.View
-                      style={{
-                        transform: [{ translateX: chevAnim.interpolate({ inputRange: [0, 1], outputRange: [-2, 2] }) }],
-                        opacity: chevAnim.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1] }),
-                      }}
-                    >
-                      <IconSymbol name="chevron.right" size={20} color={colors.primaryText} />
-                    </Animated.View>
-                    <Animated.View
-                      style={{
-                        transform: [{ translateX: chevAnim.interpolate({ inputRange: [0, 1], outputRange: [-4, 0] }) }],
-                        opacity: chevAnim.interpolate({ inputRange: [0, 1], outputRange: [0.2, 0.8] }),
-                        marginLeft: -4,
-                      }}
-                    >
-                      <IconSymbol name="chevron.right" size={20} color={colors.primaryText} />
-                    </Animated.View>
-                  </View>
-                </TouchableOpacity>
-              </Animated.View>
-            </View>
-          )}
         </View>
-
-        {showAll && (
-          <View style={[styles.unlockedNote, { marginHorizontal: 16 }]}> 
-            <IconSymbol name="checkmark.seal.fill" size={16} color={colors.success} />
-            <ThemedText style={[styles.unlockedText, { color: colors.success }]}>{t('Unlocked24h')}</ThemedText>
-          </View>
-        )}
 
         {/* Sticky Markets header (becomes header when reached) */}
         <View style={[marketStyles.stickyHeader, { backgroundColor: colors.background }]}> 
@@ -566,15 +448,6 @@ const styles = StyleSheet.create({
   stocksWrapper: {
     position: 'relative',
   },
-  unlockOverlay: {
-    position: 'absolute',
-    top: '20%', // Slightly higher positioning for better visibility
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    zIndex: 10,
-  },
   watchlistRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -628,45 +501,9 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     alignItems: 'flex-end',
   },
-  centeredUnlockBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    width: '100%',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderRadius: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-  unlockTextContainer: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  unlockedNote: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 12,
-  },
-  unlockedText: { fontWeight: '600' },
   stickyBlock: {
     paddingTop: 0,
     paddingBottom: 8,
-  },
-  unlockGlow: {
-    borderRadius: 14,
-  },
-  unlockAura: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
-    borderRadius: 16,
   },
   releaseStickyHeader: {
     height: 1,

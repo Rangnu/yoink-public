@@ -118,7 +118,7 @@ export default function ScoutersScreen() {
     return [
       {
         id: 'momentum',
-        name: 'Momentum Pulse',
+        name: 'Momentum',
         criteria: '+1.2% in 1h and +4% in 24h',
         note: 'Fast movers that are still holding their daily trend.',
         matches: momentumMatches,
@@ -126,7 +126,7 @@ export default function ScoutersScreen() {
       },
       {
         id: 'volume',
-        name: 'Volume Spike',
+        name: 'High Volume',
         criteria: 'High 24h volume with positive daily trend',
         note: 'The highest-liquidity names that are already moving.',
         matches: volumeMatches,
@@ -134,7 +134,7 @@ export default function ScoutersScreen() {
       },
       {
         id: 'breakout',
-        name: 'Breakout Watch',
+        name: 'Breakouts',
         criteria: 'Ranks 15-100 with +7% or more in 24h',
         note: 'Coins outside the mega-caps that may be rotating into focus.',
         matches: breakoutMatches,
@@ -291,7 +291,7 @@ export default function ScoutersScreen() {
                             {scouter.name}
                           </ThemedText>
                           <ThemedText style={{ color: colors.textTertiary, fontSize: 11, marginTop: 2 }} numberOfLines={1}>
-                            {t('LastRun')}: {lastUpdated ? formatRelativeTime(lastUpdated) : '--'}
+                            {t('SignalUpdated')}: {lastUpdated ? formatRelativeTime(lastUpdated) : '--'}
                           </ThemedText>
                         </View>
                       </View>
@@ -309,18 +309,14 @@ export default function ScoutersScreen() {
                       <View style={styles.stat}>
                         <IconSymbol name="chart.line.uptrend.xyaxis" size={15} color={colors.primary} />
                         <ThemedText style={{ color: colors.text, fontSize: 13, fontWeight: '600' }}>
-                          {scouter.matches.length} {t('SignalMatchesCount')}
+                          {scouter.matches.length} {t('MatchesNow')}
                         </ThemedText>
                       </View>
                     </View>
                     <View style={styles.cardActions}>
-                      <TouchableOpacity style={[styles.actionButton, { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 }]} onPress={onRefresh}>
-                        <IconSymbol name="play.fill" size={13} color={colors.primary} />
-                        <ThemedText style={{ color: colors.primary, fontSize: 12, fontWeight: '600' }}>{t('RefreshData')}</ThemedText>
-                      </TouchableOpacity>
-                      <TouchableOpacity style={[styles.actionButton, { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 }]} onPress={() => handleViewScouter(scouter.id)}>
+                      <TouchableOpacity style={[styles.actionButton, styles.singleActionButton, { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 }]} onPress={() => handleViewScouter(scouter.id)}>
                         <IconSymbol name="eye.fill" size={13} color={colors.text} />
-                        <ThemedText style={{ color: colors.text, fontSize: 12, fontWeight: '600' }}>{t('ViewMatches')}</ThemedText>
+                        <ThemedText style={{ color: colors.text, fontSize: 12, fontWeight: '600' }}>View signals</ThemedText>
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -520,6 +516,11 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingVertical: 8,
     borderRadius: 8,
+  },
+  singleActionButton: {
+    flex: 0,
+    alignSelf: 'flex-start',
+    minWidth: 128,
   },
   rowCard: {
     borderRadius: 14,

@@ -1111,7 +1111,7 @@ const rawDictionary: Record<string, Partial<Record<AppLanguage, string>>> = {
     ar: 'الكشافة',
   },
   ScoutersSubtitle: {
-    en: 'Create and manage your scouters.',
+    en: 'Live market signals built from the current feed.',
     de: 'Erstelle und verwalte deine Scouter.',
     fr: 'Créez et gérez vos éclaireurs.',
     it: 'Crea e gestisci i tuoi scout.',
@@ -1132,7 +1132,7 @@ const rawDictionary: Record<string, Partial<Record<AppLanguage, string>>> = {
     ar: 'أنشئ كشافتك وأدرها.',
   },
   RecentMatches: {
-    en: 'Recent Matches',
+    en: 'Signal snapshot',
     de: 'Neueste配对',
     fr: 'Correspondances récentes',
     it: 'Match recenti',
@@ -1216,7 +1216,7 @@ const rawDictionary: Record<string, Partial<Record<AppLanguage, string>>> = {
     ar: 'آخر تشغيل',
   },
   Active: {
-    en: 'Active',
+    en: 'Live',
     de: 'Aktiv',
     fr: 'Actif',
     it: 'Attivo',
@@ -2850,6 +2850,8 @@ const rawDictionary: Record<string, Partial<Record<AppLanguage, string>>> = {
   ComingSoonSignals: { en: 'Next signal ideas', pl: 'Następne pomysły na sygnały' },
   ComingSoonSignalsBody: { en: 'These presets need additional datasets before they can produce useful matches in the app.', pl: 'Te presety potrzebują dodatkowych zbiorów danych, zanim będą mogły dawać użyteczne dopasowania w aplikacji.' },
   RefreshData: { en: 'Refresh data', pl: 'Odśwież dane' },
+  SignalUpdated: { en: 'Updated', pl: 'Zaktualizowano' },
+  MatchesNow: { en: 'matches now', pl: 'dopasowania teraz' },
   RelativeJustNow: { en: 'just now', pl: 'przed chwilą' },
   RelativeMinutesAgo: { en: '{count}m ago', pl: '{count} min temu' },
   RelativeHoursAgo: { en: '{count}h ago', pl: '{count} godz. temu' },
